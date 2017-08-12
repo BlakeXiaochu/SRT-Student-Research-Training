@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <math.h>
 #ifdef USEOMP
 #include <omp.h>
@@ -24,7 +25,7 @@ typedef unsigned int uint32;
 	nBins 	- Quantization parameter
 	WtCumSum 	- Returned values.
 */
-void FtrsWtCumSum(uint8** FtrsVec, double* Wt, int SampNum, int FtrId, int nBins, double* WtCumSum)
+void FtrsWtCumSum(uint8** FtrsVec, double* Wt, int SampNum, uint32 FtrId, int nBins, double* WtCumSum)
 {
 	int i = 0;
 	/*Initialize*/
@@ -62,11 +63,11 @@ void FtrsWtCumSum(uint8** FtrsVec, double* Wt, int SampNum, int FtrId, int nBins
 	err  		- Return values. Minimum errors of each feature.
 	thrs 		- Return values. Corresponding thresholds of each feature
 */
-DLL_EXPORT void BestStump(uint8** PosFtrsVec, uint8** NegFtrsVec, double* PosWt, double* NegWt, int NP, int NN, int* SampFtrsId, int SampNum, int prior, int nBins, double* err, uint8* thrs)
+DLL_EXPORT void BestStump(uint8** PosFtrsVec, uint8** NegFtrsVec, double* PosWt, double* NegWt, int NP, int NN, uint32* SampFtrsId, int SampNum, double prior, int nBins, double* err, uint8* thrs)
 {
 	int i, j;
-	int Thrs1 = 0, Thrs2 = 0;
-	double Err, MinErr1 = 10.0, MaxErr2 = 10.0;
+	uint8 Thrs1, Thrs2;
+	double Err, MinErr1, MinErr2;
 	double PosWtCumSum[256], NegWtCumSum[256];
 	
 	#ifdef USEOMP
@@ -87,6 +88,8 @@ DLL_EXPORT void BestStump(uint8** PosFtrsVec, uint8** NegFtrsVec, double* PosWt,
 			MinErr = 1 - prior;
 			MaxErr = prior;
 		}*/
+		Thrs1 = Thrs2 = 0;
+		MinErr1 = MinErr2 = 10.0;
 
 		FtrsWtCumSum(PosFtrsVec, PosWt, NP, SampFtrsId[i], nBins, PosWtCumSum);
 		FtrsWtCumSum(NegFtrsVec, NegWt, NN, SampFtrsId[i], nBins, NegWtCumSum);
@@ -94,24 +97,32 @@ DLL_EXPORT void BestStump(uint8** PosFtrsVec, uint8** NegFtrsVec, double* PosWt,
 		/*Put Positive samples to left child(< thrs)*/
 		for(j = 0; j < nBins; j++)
 		{
-			Err = NegWtCumSum[j] + 1 - prior - PosWtCumSum[j];			/*prior = NegWtCumSum[255], 1 - prior = PosWtCumSum[255]*/
+			/*Put Positive samples to left child(> thrs)*/
+			Err = prior - PosWtCumSum[j] + NegWtCumSum[j];			/*prior = PosWtCumSum[255], 1 - prior = NegWtCumSum[255]*/
 			if(Err < MinErr1)
 			{
 				MinErr1 = Err;
 				Thrs1 = j;
 			}
+			/*Put Positive samples to right child(> thrs)*/
+			if(1 - Err < MinErr2)
+			{
+				MinErr2 = 1 - Err;
+				Thrs2 = j;
+			}
 		}
-
+		
 		/*Put Positive samples to right child(> thrs)*/
+		/*
 		for(j = 0; j < nBins; j++)
 		{
-			Err = PosWtCumSum[j] + prior - NegWtCumSum[j];
+			Err = 1 + PosWtCumSum[j] - prior - NegWtCumSum[j];
 			if(Err < MinErr2)
 			{
 				MinErr2 = Err;
 				Thrs2 = j;
 			}
-		}
+		}*/
 
 		
 		if(MinErr1 < MinErr2)
@@ -143,6 +154,7 @@ DLL_EXPORT void BestStump(uint8** PosFtrsVec, uint8** NegFtrsVec, double* PosWt,
 				else {thrs[i] = Thrs2; err[i] = MinErr2;}
 			}
 		}
+		/*printf("%f %f\n", MinErr1, MinErr2);*/
 	}
 
 	return;
