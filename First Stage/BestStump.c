@@ -4,8 +4,6 @@
 #include <omp.h>
 #endif
 
-#define min(x,y) ((x) < (y) ? (x) : (y))
-
 typedef unsigned char uint8;
 typedef unsigned int uint32;
 
@@ -78,16 +76,6 @@ DLL_EXPORT void BestStump(uint8** PosFtrsVec, uint8** NegFtrsVec, double* PosWt,
 	/*Go through every subsamples of feature*/
 	for(i = 0; i < SampNum; i++)
 	{
-		/*if(prior < 0.5)
-		{
-			MinErr = prior;
-			MaxErr = 1 - prior;
-		}
-		else
-		{
-			MinErr = 1 - prior;
-			MaxErr = prior;
-		}*/
 		Thrs1 = Thrs2 = 0;
 		MinErr1 = MinErr2 = 10.0;
 
@@ -111,50 +99,21 @@ DLL_EXPORT void BestStump(uint8** PosFtrsVec, uint8** NegFtrsVec, double* PosWt,
 				Thrs2 = j;
 			}
 		}
-		
-		/*Put Positive samples to right child(> thrs)*/
-		/*
-		for(j = 0; j < nBins; j++)
-		{
-			Err = 1 + PosWtCumSum[j] - prior - NegWtCumSum[j];
-			if(Err < MinErr2)
-			{
-				MinErr2 = Err;
-				Thrs2 = j;
-			}
-		}*/
 
+		MinErr1 = (MinErr1 < MinErr2) ? MinErr1 : MinErr2;
+		Thrs1 = (MinErr1 < MinErr2) ? Thrs1 : Thrs2;
 		
-		if(MinErr1 < MinErr2)
+		if(prior < 0.5)
 		{
-			if(prior < 0.5)
-			{
-				/*Judge wheather classification does acquire a lower error*/
-				if(MinErr1 >= prior) {thrs[i] = nBins - 1; err[i] = prior;}
-				else {thrs[i] = Thrs1; err[i] = MinErr1;}
-			}
-			else
-			{
-				if(MinErr1 >= 1 - prior) {thrs[i] = nBins - 1; err[i] = prior;}
-				else {thrs[i] = Thrs1; err[i] = MinErr1;}
-			}
+			/*Judge wheather classification does acquire a lower error*/
+			if(MinErr1 >= prior) {thrs[i] = nBins - 1; err[i] = prior;}
+			else {thrs[i] = Thrs1; err[i] = MinErr1;}
 		}
 		else
 		{
-			/*If classification does not acquire a lower error*/
-			if(prior < 0.5)
-			{
-				/*Judge wheather classification does acquire a lower error*/
-				if(MinErr2 >= prior) {thrs[i] = 0; err[i] = prior;}
-				else {thrs[i] = Thrs2; err[i] = MinErr2;}
-			}
-			else
-			{
-				if(MinErr2 >= 1 - prior) {thrs[i] = 0; err[i] = prior;}
-				else {thrs[i] = Thrs2; err[i] = MinErr2;}
-			}
+			if(MinErr1 >= 1 - prior) {thrs[i] = nBins - 1; err[i] = prior;}
+			else {thrs[i] = Thrs1; err[i] = MinErr1;}
 		}
-		/*printf("%f %f\n", MinErr1, MinErr2);*/
 	}
 
 	return;
