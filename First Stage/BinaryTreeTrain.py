@@ -8,12 +8,12 @@ def BianryTreeTrian(data, **pTree):
 		INPUTS
 			data       - (dict)data for training tree.
 			dict key(type: str):
-				PosFtrsVec         - [NPxF] negative feature vectors
-				NegFtrsVec         - [NNxF] positive feature vectors
+				PosFtrsVec         - [NPxF] negative feature vectors(Each row represents a sample, and each column represents a feature)
+				NegFtrsVec         - [NNxF] positive feature vectors(Each row represents a sample, and each column represents a feature)
 				PosFtrsVecToC	   - [NPx1] positive feature row vectors pointer(used in BestStump.c)
 				NegFtrsVecToC	   - [NNx1] negative feature row vectors pointer(used in BestStump.c)
-				PosWt       - [NPx1] negative weights
-				NegWt       - [NNx1] positive weights
+				PosWt       - [NPx1] positive samples weights
+				NegWt       - [NNx1] negative samples weights
 				xMin       - [1xF] optional vals defining feature quantization
 				xMax      - [1xF] optional vals defining feature quantization
 				xType      - [] optional original data type for features
@@ -41,22 +41,39 @@ def BianryTreeTrian(data, **pTree):
 	import numpy as np
 	import ctypes
 
+	#Deep copy a dict object
+	def DeepCopy(a):
+		if not isinstance(a, dict):
+			raise TypeError
+		b = dict()
+		for key in a:
+			if 'copy' in dir(a[key]):
+				b[key] = a[key].copy()
+			else:
+				b[key] = a[key]
+		return b
+
+
 	#Merge pTree parameters
-	pTree = pTree.copy()
+	pTree = DeepCopy(pTree)
 	#default parameters
 	pTree_dfs = {'nBins': 256, 'maxDepth': 1, 'minWeight': 0.01, 'fracFtrs': 1, 'nThreads': 16}
-	pTree = dict(pTree, **pTree_dfs)
+	pTree_dfs_copy = pTree_dfs.copy()
+	pTree_dfs_copy.update(pTree)
+	pTree = pTree_dfs_copy
 
 	#Merge data parameters
-	data = data.copy()
+	data = DeepCopy(data)
 	data_dfs = {'PosFtrsVec': 'REQ', 'NegFtrsVec': 'REQ', 'PosWt': [], 'NegWt': [], 'xMin': [], 'xMax': [], 'xType':[]}
-	data = dict(data, **data_dfs)
+	data_dfs_copy = data_dfs.copy()
+	data_dfs_copy.update(data)
+	data = data_dfs_copy
 
-	if (not data.has_key('PosFtrsVecToC')) or (not data['PosFtrsVecToC']):
+	if ( not ('PosFtrsVecToC' in data.keys()) ) or (not data['PosFtrsVecToC']):
 		RowId = np.arange(data['PosFtrsVec'].shape[0])
 		data['PosFtrsVecToC'] = (data['PosFtrsVec'].ctypes.data + data['PosFtrsVec'].strides[0] * RowId).astype('uintp')
 		del(RowId)
-	if (not data.has_key('NegFtrsVecToC')) or (not data['NegFtrsVecToC']):
+	if ( not ('NegFtrsVecToC' in data.keys()) ) or (not data['NegFtrsVecToC']):
 		RowId = np.arange(data['NegFtrsVec'].shape[0])
 		data['NegFtrsVecToC'] = (data['NegFtrsVec'].ctypes.data + data['NegFtrsVec'].strides[0] * RowId).astype('uintp')
 		del(RowId)
@@ -69,23 +86,23 @@ def BianryTreeTrian(data, **pTree):
 
 	tree = dict()
 	MaxNodes = (NP + FP) * 2									#Maximum number of nodes in BinaryTree
-	tree['fids'] = zeros(MaxNodes, dtype = 'uint32')
-	tree['thrs'] = zeros(MaxNodes, dtype = 'float64')   #dtype??
-	tree['child'] = zeros(MaxNodes, dtype = 'uint32')
-	tree['hs'] = zeros(MaxNodes, dtype = 'float64')
-	tree['weights'] = zeros(MaxNodes, dtype = 'float64')
-	tree['depth'] = zeros(MaxNodes, dtype = 'uint32')
+	tree['fids'] = np.zeros(MaxNodes, dtype = 'uint32')
+	tree['thrs'] = np.zeros(MaxNodes, dtype = 'float64')   		#dtype??
+	tree['child'] = np.zeros(MaxNodes, dtype = 'uint32')
+	tree['hs'] = np.zeros(MaxNodes, dtype = 'float64')
+	tree['weights'] = np.zeros(MaxNodes, dtype = 'float64')
+	tree['depth'] = np.zeros(MaxNodes, dtype = 'uint32')
 
 	if not data['PosWt']:
-		data['PosWt'] = ones(NP, dtype = 'float64') / (NP + NN)
+		data['PosWt'] = np.ones(NP, dtype = 'float64') / NP
 	if not data['NegWt']:
-		data['NegWt'] = ones(NN, dtype = 'float64') / (NN + NP)
+		data['NegWt'] = np.ones(NN, dtype = 'float64') / NN
 	w = np.sum(data['PosWt']) + np.sum(data['NegWt'])
-	if abds(w - 1) > 1e-3:
+	if abs(w - 1) > 1e-3:
 		data['PosWt'] /= w
 		data['NegWt'] /= w
 
-	err = zeros(MaxNodes, dtype = 'float64')
+	err = np.zeros(MaxNodes, dtype = 'float64')
 
 	#Quantize data
 	if not (str(data['PosFtrsVec'].dtype) == 'uint8' and str(data['NegFtrsVec'].dtype) == 'uint8'):
@@ -105,7 +122,7 @@ def BianryTreeTrian(data, **pTree):
 		#Quantize to 0 ~ nBins-1
 		data['xMin'] = xMin
 		data['xMax'] = xMax
-		data['xType'] = str(data['PosFtrsVec'])
+		data['xType'] = str(data['PosFtrsVec'].dtype)
 		data['PosFtrsVec'] = (data['PosFtrsVec'] - xMin) / (xMax - xMin) * (pTree['nBins'] - 1)
 		data['PosFtrsVec'] = data['PosFtrsVec'].astype('uint8')
 		data['NegFtrsVec'] = (data['NegFtrsVec'] - xMin) / (xMax - xMin) * (pTree['nBins'] - 1)
@@ -123,11 +140,11 @@ def BianryTreeTrian(data, **pTree):
 	#Load the C-function
 	pp = npcl.ndpointer(dtype = 'uintp', ndim = 1, flags = 'C')		#2D pointer(pointer to pointer)
 	double_p = npcl.ndpointer(dtype = 'float64', ndim = 1, flags = 'C')
-	int_p = npcl.ndpointer(dtype = 'int32', ndim = 1, flags = 'C')
+	uint32_p = npcl.ndpointer(dtype = 'uint32', ndim = 1, flags = 'C')
 	uint8_p = npcl.ndpointer(dtype = 'uint8', ndim = 1, flags = 'C')
 	f = npcl.load_library('BestStump', '.')
 	f.BestStump.restype = None
-	f.BestStump.argtypes = [pp, pp, double_p, double_p, ctypes.c_int, ctypes.c_int, int_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, double_p, uint8_p]
+	f.BestStump.argtypes = [pp, pp, double_p, double_p, ctypes.c_int, ctypes.c_int, uint32_p, ctypes.c_int, ctypes.c_double, ctypes.c_int, double_p, uint8_p]
 
 	while CurNode < LastNode:
 		NodePosWt = NodePosWtList[CurNode]
@@ -136,10 +153,10 @@ def BianryTreeTrian(data, **pTree):
 		NodeNegWtList[CurNode] = []
 		NodePosWtSum = np.sum(NodePosWt)
 		NodeNegWtSum = np.sum(NodeNegWt)
-		NodeWtSum = NodePosWt + NodePosWt
+		NodeWtSum = NodePosWtSum + NodeNegWtSum
 
 		tree['weights'][CurNode] = NodeWtSum
-		prior = NodeNegWtSum / NodeWtSum
+		prior = NodePosWtSum / NodeWtSum
 		err[CurNode] = min(prior, 1 - prior)
 		alpha = 0.5 * log(prior / (1 - prior))
 		tree['hs'][CurNode] = max(-4.0, min(4.0, alpha))
@@ -153,21 +170,37 @@ def BianryTreeTrian(data, **pTree):
 		#wheather subsample the features or not
 		assert pTree['fracFtrs'] <= 1
 		if pTree['fracFtrs'] < 1:
-			StFtrsId = np.choice(np.arange(F), floor(pTree['fracFtrs'] * F))
+			StFtrsId = np.choice(np.arange(F), floor(pTree['fracFtrs'] * F)).astype('uint32')
 		else: 
-			StFtrsId = np.arange(F)
+			StFtrsId = np.arange(F, dtype = 'uint32')
 		
+
+		St_thrs = np.zeros(floor(pTree['fracFtrs'] * F), dtype = 'uint8')
+		St_errs = np.zeros(floor(pTree['fracFtrs'] * F), dtype = 'float64')
 		#Best Stump(For effiency, Coding in C)!!!!!!!!!!!!!!
-		f.BestStump()					
+		f.BestStump(
+			data['PosFtrsVecToC'],
+			data['NegFtrsVecToC'],
+			data['PosWt'],
+			data['NegWt'],
+			ctypes.c_int(NP),
+			ctypes.c_int(NN),
+			StFtrsId,
+			ctypes.c_int( floor(pTree['fracFtrs'] * F) ),
+			ctypes.c_double(prior),
+			ctypes.c_int(pTree['nBins']), 
+			St_errs,
+			St_thrs
+			)					
 
 		BestFtrsId = np.argmin(St_errs)
-		BestThrs = St_thrs[BestThrs] + 0.5
+		BestThrs = St_thrs[BestFtrsId] + 0.5
 		BestFtrsId = StFtrsId[BestFtrsId]
 
 		#Split node
 		LeftCldPosWt = data['PosFtrsVec'][:, BestFtrsId] < BestThrs 		#Node's left child's positive samples' weights
 		LeftCldNegWt = data['NegFtrsVec'][:, BestFtrsId] < BestThrs
-		if (np.any(LeftCldPosWt) or np.any(LeftCldNegWt))  or  (np.any(~LeftCldPosWt) or np.any(~LeftCldNegWt)):
+		if (np.any(LeftCldPosWt) or np.any(LeftCldNegWt))  or  (np.any(~LeftCldPosWt) or np.any(~LeftCldNegWt)):		#Invalid stump classification
 			#Inverse quantization
 			BestThrs = xMin[BestFtrsId] + BestThrs * (xMax[BestFtrsId] - xMin[BestFtrsId]) / (pTree['nBins'] - 1)
 			NodePosWtList[LastNode] = LeftCldPosWt * data['PosWt']
@@ -191,13 +224,7 @@ def BianryTreeTrian(data, **pTree):
 		tree['hs'] = tree['hs'][0:LastNode].copy()
 		tree['weights'] = tree['weights'][0:LastNode].copy()
 		tree['depth'] = tree['depth'][0:LastNode].copy()
+		err = err[0:LastNode].copy()
 
 		#return
 		return tree, data, err
-
-
-
-
-
-
-
