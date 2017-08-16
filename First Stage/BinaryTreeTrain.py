@@ -69,6 +69,7 @@ def BianryTreeTrian(data, **pTree):
 	data_dfs_copy.update(data)
 	data = data_dfs_copy
 
+	#1D-Pointer array
 	if ( not ('PosFtrsVecToC' in data.keys()) ) or (not data['PosFtrsVecToC']):
 		RowId = np.arange(data['PosFtrsVec'].shape[0])
 		data['PosFtrsVecToC'] = (data['PosFtrsVec'].ctypes.data + data['PosFtrsVec'].strides[0] * RowId).astype('uintp')
@@ -127,7 +128,13 @@ def BianryTreeTrian(data, **pTree):
 		data['PosFtrsVec'] = data['PosFtrsVec'].astype('uint8')
 		data['NegFtrsVec'] = (data['NegFtrsVec'] - xMin) / (xMax - xMin) * (pTree['nBins'] - 1)
 		data['NegFtrsVec'] = data['NegFtrsVec'].astype('uint8')
-
+		#Rearrange 1D-Pointer array 
+		RowId = np.arange(data['PosFtrsVec'].shape[0])
+		data['PosFtrsVecToC'] = (data['PosFtrsVec'].ctypes.data + data['PosFtrsVec'].strides[0] * RowId).astype('uintp')
+		del(RowId)
+		RowId = np.arange(data['NegFtrsVec'].shape[0])
+		data['NegFtrsVecToC'] = (data['NegFtrsVec'].ctypes.data + data['NegFtrsVec'].strides[0] * RowId).astype('uintp')
+		del(RowId)
 
 	#Train Decision Tree
 	CurNode = 0                        #Current Node's id
@@ -174,7 +181,6 @@ def BianryTreeTrian(data, **pTree):
 		else: 
 			StFtrsId = np.arange(F, dtype = 'uint32')
 		
-
 		St_thrs = np.zeros(floor(pTree['fracFtrs'] * F), dtype = 'uint8')
 		St_errs = np.zeros(floor(pTree['fracFtrs'] * F), dtype = 'float64')
 		#Best Stump(For effiency, Coding in C)!!!!!!!!!!!!!!
@@ -191,8 +197,8 @@ def BianryTreeTrian(data, **pTree):
 			ctypes.c_int(pTree['nBins']), 
 			St_errs,
 			St_thrs
-			)					
-
+			)			
+		
 		BestFtrsId = np.argmin(St_errs)
 		BestThrs = St_thrs[BestFtrsId] + 0.5
 		BestFtrsId = StFtrsId[BestFtrsId]
