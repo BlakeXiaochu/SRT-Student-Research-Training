@@ -165,12 +165,17 @@ def BianryTreeTrian(data, **pTree):
 		tree['weights'][CurNode] = NodeWtSum
 		prior = NodePosWtSum / NodeWtSum
 		err[CurNode] = min(prior, 1 - prior)
-		alpha = 0.5 * log(prior / (1 - prior))
-		tree['hs'][CurNode] = max(-4.0, min(4.0, alpha))
+		constant = np.e**8 / (1 + np.e**8)
+		alpha =  4.0 if (prior > constant) else \
+				-4.0 if (prior < 1 - constant) else \
+				0.5 * log(prior / (1 - prior))
+		tree['hs'][CurNode] = alpha
+		#alpha = 0.5 * log(prior / (1 - prior))
+		#tree['hs'][CurNode] = max(-4.0, min(4.0, alpha))
 
 		#Node's classification is nearly pure, node's depth is out of scale, sum of node samples' weight is out of scale
-		if (prior < 1e-3 or prior > 1 - 1e-3) or (tree['depth'][CurNode] > pTree['maxDepth']) or (NodeWtSum < pTree['minWeight']) :
-			k += 1
+		if (prior < 1e-3 or prior > 1 - 1e-3) or (tree['depth'][CurNode] >= pTree['maxDepth']) or (NodeWtSum < pTree['minWeight']) :
+			CurNode += 1
 			continue
 
 		#Find best tree stump
@@ -187,8 +192,8 @@ def BianryTreeTrian(data, **pTree):
 		f.BestStump(
 			data['PosFtrsVecToC'],
 			data['NegFtrsVecToC'],
-			data['PosWt'],
-			data['NegWt'],
+			data['PosWt'] / NodeWtSum,
+			data['NegWt'] / NodeWtSum,
 			ctypes.c_int(NP),
 			ctypes.c_int(NN),
 			StFtrsId,
@@ -198,7 +203,6 @@ def BianryTreeTrian(data, **pTree):
 			St_errs,
 			St_thrs
 			)			
-		
 		BestFtrsId = np.argmin(St_errs)
 		BestThrs = St_thrs[BestFtrsId] + 0.5
 		BestFtrsId = StFtrsId[BestFtrsId]
@@ -206,7 +210,7 @@ def BianryTreeTrian(data, **pTree):
 		#Split node
 		LeftCldPosWt = data['PosFtrsVec'][:, BestFtrsId] < BestThrs 		#Node's left child's positive samples' weights
 		LeftCldNegWt = data['NegFtrsVec'][:, BestFtrsId] < BestThrs
-		if (np.any(LeftCldPosWt) or np.any(LeftCldNegWt))  or  (np.any(~LeftCldPosWt) or np.any(~LeftCldNegWt)):		#Invalid stump classification
+		if (np.any(LeftCldPosWt) or np.any(LeftCldNegWt))  and  (np.any(~LeftCldPosWt) or np.any(~LeftCldNegWt)):		#Invalid stump classification
 			#Inverse quantization
 			BestThrs = xMin[BestFtrsId] + BestThrs * (xMax[BestFtrsId] - xMin[BestFtrsId]) / (pTree['nBins'] - 1)
 			NodePosWtList[LastNode] = LeftCldPosWt * data['PosWt']
@@ -223,14 +227,14 @@ def BianryTreeTrian(data, **pTree):
 
 		CurNode += 1
 
-		#Modefy parameter 'tree':
-		tree['fids'] = tree['fids'][0:LastNode].copy()
-		tree['thrs'] = tree['thrs'][0:LastNode].copy()
-		tree['child'] = tree['child'][0:LastNode].copy()
-		tree['hs'] = tree['hs'][0:LastNode].copy()
-		tree['weights'] = tree['weights'][0:LastNode].copy()
-		tree['depth'] = tree['depth'][0:LastNode].copy()
-		err = err[0:LastNode].copy()
+	#Modefy parameter 'tree':
+	tree['fids'] = tree['fids'][0:LastNode].copy()
+	tree['thrs'] = tree['thrs'][0:LastNode].copy()
+	tree['child'] = tree['child'][0:LastNode].copy()
+	tree['hs'] = tree['hs'][0:LastNode].copy()
+	tree['weights'] = tree['weights'][0:LastNode].copy()
+	tree['depth'] = tree['depth'][0:LastNode].copy()
+	err = err[0:LastNode].copy()
 
-		#return
-		return tree, data, err
+	#return
+	return tree, data, err

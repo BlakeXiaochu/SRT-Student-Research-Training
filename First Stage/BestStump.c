@@ -112,7 +112,7 @@ DLL_EXPORT void BestStump(uint8** PosFtrsVec, uint8** NegFtrsVec, double* PosWt,
 		}
 		else
 		{
-			if(MinErr1 >= 1 - prior) {thrs[i] = nBins - 1; err[i] = prior;}
+			if(MinErr1 >= 1 - prior) {thrs[i] = nBins - 1; err[i] = 1 - prior;}
 			else {thrs[i] = Thrs1; err[i] = MinErr1;}
 		}
 	}
