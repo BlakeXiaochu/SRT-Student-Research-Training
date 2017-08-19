@@ -3,7 +3,7 @@ def BianryTreeTrian(data, **pTree):
 		Reference to piotr dollar's Computer Vision matlab toolbox
 
 		USAGE
-		[tree,data,err] = binaryTreeTrain( data, [pTree] )
+		[tree,data,errs] = binaryTreeTrain( data, [pTree] )
 
 		INPUTS
 			data       - (dict)data for training tree.
@@ -103,7 +103,7 @@ def BianryTreeTrian(data, **pTree):
 		data['PosWt'] /= w
 		data['NegWt'] /= w
 
-	err = np.zeros(MaxNodes, dtype = 'float64')
+	errs = np.zeros(MaxNodes, dtype = 'float64')
 
 	#Quantize data
 	if not (str(data['PosFtrsVec'].dtype) == 'uint8' and str(data['NegFtrsVec'].dtype) == 'uint8'):
@@ -164,7 +164,7 @@ def BianryTreeTrian(data, **pTree):
 
 		tree['weights'][CurNode] = NodeWtSum
 		prior = NodePosWtSum / NodeWtSum
-		err[CurNode] = min(prior, 1 - prior)
+		errs[CurNode] = min(prior, 1 - prior)
 		constant = np.e**8 / (1 + np.e**8)
 		alpha =  4.0 if (prior > constant) else \
 				-4.0 if (prior < 1 - constant) else \
@@ -203,7 +203,6 @@ def BianryTreeTrian(data, **pTree):
 			St_errs,
 			St_thrs
 			)
-		print(CurNode, LastNode, prior, '\n', St_errs, '\n', St_thrs)
 		BestFtrsId = np.argmin(St_errs)
 		BestThrs = St_thrs[BestFtrsId] + 0.5
 		BestFtrsId = StFtrsId[BestFtrsId]
@@ -235,7 +234,7 @@ def BianryTreeTrian(data, **pTree):
 	tree['hs'] = tree['hs'][0:LastNode].copy()
 	tree['weights'] = tree['weights'][0:LastNode].copy()
 	tree['depth'] = tree['depth'][0:LastNode].copy()
-	err = err[0:LastNode].copy()
+	err = np.sum(errs[0:LastNode] * tree['weights'] * (tree['child'] == 0))				#Sum up the leaf nodes' error
 
 	#return
 	return tree, data, err
