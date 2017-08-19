@@ -192,8 +192,8 @@ def BianryTreeTrian(data, **pTree):
 		f.BestStump(
 			data['PosFtrsVecToC'],
 			data['NegFtrsVecToC'],
-			data['PosWt'] / NodeWtSum,
-			data['NegWt'] / NodeWtSum,
+			NodePosWt / NodeWtSum,
+			NodeNegWt / NodeWtSum,
 			ctypes.c_int(NP),
 			ctypes.c_int(NN),
 			StFtrsId,
@@ -202,7 +202,8 @@ def BianryTreeTrian(data, **pTree):
 			ctypes.c_int(pTree['nBins']), 
 			St_errs,
 			St_thrs
-			)			
+			)
+		print(CurNode, LastNode, prior, '\n', St_errs, '\n', St_thrs)
 		BestFtrsId = np.argmin(St_errs)
 		BestThrs = St_thrs[BestFtrsId] + 0.5
 		BestFtrsId = StFtrsId[BestFtrsId]
@@ -210,11 +211,11 @@ def BianryTreeTrian(data, **pTree):
 		#Split node
 		LeftCldPosWt = data['PosFtrsVec'][:, BestFtrsId] < BestThrs 		#Node's left child's positive samples' weights
 		LeftCldNegWt = data['NegFtrsVec'][:, BestFtrsId] < BestThrs
-		if (np.any(LeftCldPosWt) or np.any(LeftCldNegWt))  and  (np.any(~LeftCldPosWt) or np.any(~LeftCldNegWt)):		#Invalid stump classification
+		if (np.any(LeftCldPosWt) or np.any(LeftCldNegWt))  and  (np.any(~LeftCldPosWt) or np.any(~LeftCldNegWt)):		#Invalid stump classifier
 			#Inverse quantization
 			BestThrs = xMin[BestFtrsId] + BestThrs * (xMax[BestFtrsId] - xMin[BestFtrsId]) / (pTree['nBins'] - 1)
-			NodePosWtList[LastNode] = LeftCldPosWt * data['PosWt']
-			NodeNegWtList[LastNode] = LeftCldNegWt * data['NegWt']
+			NodePosWtList[LastNode] = LeftCldPosWt * NodePosWt
+			NodeNegWtList[LastNode] = LeftCldNegWt * NodeNegWt
 			NodePosWtList[LastNode + 1] = (~LeftCldPosWt) * NodePosWt
 			NodeNegWtList[LastNode + 1] = (~LeftCldNegWt) * NodeNegWt
 
