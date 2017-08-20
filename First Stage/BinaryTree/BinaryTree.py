@@ -7,13 +7,164 @@ import ctypes
 class TrainParamBin(object):
 	def __init__(self):
 		#Limit the parameters
-		self.__slots__ = ('nBins', 'maxDepth', 'minWeight', 'fracFtrs', 'nThreads')
+		self.__slots__ = ('nBins', 'MaxDepth', 'MinWeight', 'FracFtrs', 'nThreads')
 		#Default
 		self.nBins = 256
-		self.maxDepth = 1
-		self.minWeight = 0.01
-		self.fracFtrs = 1.0
+		self.MaxDepth = 1
+		self.MinWeight = 0.01
+		self.FracFtrs = 1.0
 		self.nThreads = 16
+
+#Data bin class, used for storing trainning data.
+class DataBin(object):
+	'''
+		Attributes:
+			PosSamp         - [NPxF] negative feature vectors(Each row represents a sample, and each column represents a feature)
+			NegSamp         - [NNxF] positive feature vectors(Each row represents a sample, and each column represents a feature)
+			QuantPosSamp	- [NPxF] quantized positive samples
+			QuantNegSamp	- [NNxF] quantized negative samples
+			PosSampITF	   - [NPx1]quantized positive feature row vectors pointer interface(used in BestStump.c)
+			NegSampITF	   - [NNx1]quantized negative feature row vectors pointer interface(used in BestStump.c)
+			PosWt       - [NPx1] positive samples weights
+			NegWt       - [NNx1] negative samples weights
+			xMin       - [1xF] optional vals defining feature quantization
+			xMax      - [1xF] optional vals defining feature quantization
+			Quant 		- Quantization flag
+			nBins 		- Number of Quantization bins
+	'''
+	def __init__(self, PosSamp, NegSamp, PosWt = None, NegWt = None, nBins = 256):
+		self.__slots__ = ('PosSamp', 'NegSamp', 'PosWt', 'NegWt', 'PosSampITF', 'NegSampITF', 'QuantPosSamp', 'QuantNegSamp', 'xMin', 'xMax', 'Quant', 'nBins')
+		#Check data type
+		if isinstance(PosSamp, np.ndarray):
+			self.PosSamp = PosSamp
+		else:
+			print('np.ndarray is required.')
+			raise TypeError
+		if isinstance(NegSamp, np.ndarray):
+			self.NegSamp = NegSamp
+		else:
+			print('np.ndarray is required.')
+			raise TypeError
+
+		#Check the shape of Pos and Neg
+		if PosSamp.shape[1] != NegSamp.shape[1]:
+			print("Postive samples' shape", PosSamp.shape, "does not match negtive samples'", NegSamp.shape)
+			raise ValueError
+
+		#Check data type
+		if isinstance(PosWt, np.ndarray):
+			self.PosWt = PosWt
+		elif PosWt is None:
+			NP = self.PosSamp.shape[0]
+			self.PosWt = np.ones(NP, dtype = 'float64') / NP
+		else:
+			print('np.ndarray is required.')
+			raise TypeError
+
+		if isinstance(NegWt, np.ndarray):
+			self.NegWt = NegWt
+		elif NegWt is None:
+			NN = self.NegSamp.shape[0]
+			self.NegWt = np.ones(NN, dtype = 'float64') / NN
+		else:
+			print('np.ndarray is required.')
+			raise TypeError
+
+		#Check the sum of weights
+		w = np.sum(self.PosWt) + np.sum(self.NegWt)
+		if abs(w - 1) > 1e-3:
+			self.PosWt /= w
+			self.NegWt /= w
+
+		if  isinstance(nBins, int):
+			self.nBins = nBins
+		else:
+			print('nBins:', 'type int is required.')
+			raise TypeError
+
+		self.PosSampITF = None 
+		self.NegSampITF = None
+		self.QuantPosSamp = None
+		self.QuantNegSamp = None
+		self.xMin = None
+		self.xMax = None
+		self.Quant = False
+
+
+	#Construct a brand-new data bin
+	def Copy(self):
+		NewDataBin = DataBin(self.PosSamp.copy(), self.NegSamp.copy(), self.PosWt.copy(), self.NegWt.copy(), self.nBins)
+
+		if isinstance(self.QuantPosSamp, np.ndarray):
+			NewDataBin.QuantPosSamp = self.QuantPosSamp.copy()
+		else: 
+			NewDataBin.QuantPosSamp = None
+
+		if isinstance(self.QuantNegSamp, np.ndarray):
+			NewDataBin.QuantNegSamp = self.QuantNegSamp.copy()
+		else: 
+			NewDataBin.QuantNegSamp = None
+
+		if isinstance(self.xMin, np.ndarray):
+			NewDataBin.xMin = self.xMin.copy()
+		else: 
+			NewDataBin.xMin = None
+
+		if isinstance(self.xMax, np.ndarray):
+			NewDataBin.xMax = self.xMax.copy()
+		else: 
+			NewDataBin.xMax = None
+
+		NewDataBin.Quant = self.Quant
+
+		#Construct 1D-Pointer array interface
+		RowId = np.arange(NewDataBin.QuantPosSamp.shape[0])
+		NewDataBin.PosSampITF = (NewDataBin.QuantPosSamp.ctypes.data + NewDataBin.QuantPosSamp.strides[0] * RowId).astype('uintp')
+		del(RowId)
+		RowId = np.arange(NewDataBin.QuantNegSamp.shape[0])
+		NewDataBin.NegSampITF = (NewDataBin.QuantNegSamp.ctypes.data + NewDataBin.QuantNegSamp.strides[0] * RowId).astype('uintp')
+		del(RowId)
+
+		return NewDataBin
+
+
+	def Quantize(self):
+		if self.Quant == True:
+			return
+
+		#find minimum values of each feature
+		PosxMin = np.min(self.PosSamp, axis = 0)
+		NegxMin = np.min(self.NegSamp, axis = 0)
+		self.xMin = np.where(PosxMin < NegxMin, PosxMin, NegxMin)
+		del(PosxMin)
+		del(NegxMin)
+		PosxMax = np.max(self.PosSamp, axis = 0)
+		NegxMax = np.max(self.NegSamp, axis = 0)
+		self.xMax = np.where(PosxMax > NegxMax, PosxMax, NegxMax)
+		del(PosxMax)
+		del(NegxMax)
+
+		#Quantize to 0 ~ nBins-1
+		QuantPosSamp = (self.PosSamp - self.xMin) / (self.xMax - self.xMin) * (self.nBins - 1)
+		self.QuantPosSamp = QuantPosSamp.astype('uint8')
+		del(QuantPosSamp)
+
+		QuantNegSamp = (self.NegSamp - self.xMin) / (self.xMax - self.xMin) * (self.nBins - 1)
+		self.QuantNegSamp = QuantNegSamp.astype('uint8')
+		del(QuantNegSamp)
+
+		#Construct 1D-Pointer array interface
+		RowId = np.arange(self.QuantPosSamp.shape[0])
+		self.PosSampITF = (self.QuantPosSamp.ctypes.data + self.QuantPosSamp.strides[0] * RowId).astype('uintp')
+		del(RowId)
+		RowId = np.arange(self.QuantNegSamp.shape[0])
+		self.NegSampITF = (self.QuantNegSamp.ctypes.data + self.QuantNegSamp.strides[0] * RowId).astype('uintp')
+		del(RowId)
+
+		self.Quant = True
+
+		return
+
 
 
 class BinaryTree(object):
@@ -23,9 +174,9 @@ class BinaryTree(object):
 			pTree      - Trainning parameters
 			dict key(type: str):
 				nBins      - [256] maximum number of quanizaton bins (<=256)
-				maxDepth   - [1] maximum depth of tree
-				minWeight  - [.01] minimum sample weigth to allow split
-				fracFtrs   - [1] fraction of features numbers to sample for each node split
+				MaxDepth   - [1] maximum depth of tree
+				MinWeight  - [.01] minimum sample weigth to allow split
+				FracFtrs   - [1] fraction of features numbers to sample for each node split
 				nThreads   - [16] max number of computational threads to use
 		'''
 		self.__slots__ = ('pTree', 'Tree', 'err')
@@ -37,29 +188,26 @@ class BinaryTree(object):
 			print('No Such parameter:', key)
 			raise e
 		finally:
-			assert self.pTree.fracFtrs <= 1
+			assert self.pTree.FracFtrs <= 1
 
 	#Given data, find the best stump classifier.
-	#Wrap the function in C
-	def BestStump(self, data, PosWt, NegWt, StpFtrsId = None, prior = None):
+	#Wrap the function in C. Not recommanded to use alone.
+	def BestStump(self, data, NodePosWt, NodeNegWt, StpFtrsId = None, prior = None):
+		if not isinstance(data, DataBin):
+			print('DataBin object type is required.')
+			raise TypeError
+
 		if not prior:
 			PosWtSum = np.sum(PosWt)
 			NegWtSum = np.sum(NegWt)
 			WtSum = PosWtSum + NegWtSum
 			prior = PosWtSum / WtSum
 
+		if not data.Quant:
+			data.Quantize()
+
 		if not isinstance(StpFtrsId, np.ndarray):
-			StpFtrsId = np.arange(data['PosFtrsVec'].shape[1], dtype = 'uint32')
-
-		if not isinstance(data.get('PosFtrsVecToC'), np.ndarray):
-			RowId = np.arange(data['PosFtrsVec'].shape[0])
-			data['PosFtrsVecToC'] = (data['PosFtrsVec'].ctypes.data + data['PosFtrsVec'].strides[0] * RowId).astype('uintp')
-			del(RowId)
-
-		if not isinstance(data.get('NegFtrsVecToC'), np.ndarray):
-			RowId = np.arange(data['NegFtrsVec'].shape[0])
-			data['NegFtrsVecToC'] = (data['NegFtrsVec'].ctypes.data + data['PosFtrsVec'].strides[0] * RowId).astype('uintp')
-			del(RowId)
+			StpFtrsId = np.arange(data.PosSamp.shape[1], dtype = 'uint32')
 
 		#Load the C-function
 		pp = npcl.ndpointer(dtype = 'uintp', ndim = 1, flags = 'C')		#2D pointer(pointer to pointer)
@@ -84,20 +232,20 @@ class BinaryTree(object):
 			uint8_p
 			]
 
-		(NP, F) = data['PosFtrsVec'].shape
-		NN = data['NegFtrsVec'].shape[0]
-		StpThrs = np.zeros(floor(self.pTree.fracFtrs * F), dtype = 'uint8')
-		StpErrs = np.zeros(floor(self.pTree.fracFtrs * F), dtype = 'float64')
+		(NP, F) = data.PosSamp.shape
+		NN = data.NegSamp.shape[0]
+		StpThrs = np.zeros(floor(self.pTree.FracFtrs * F), dtype = 'uint8')
+		StpErrs = np.zeros(floor(self.pTree.FracFtrs * F), dtype = 'float64')
 		#Best Stump(For effiency, Coding in C)
 		f.BestStump(
-			data['PosFtrsVecToC'],
-			data['NegFtrsVecToC'],
-			PosWt,
-			NegWt,
+			data.PosSampITF,
+			data.NegSampITF,
+			NodePosWt,
+			NodeNegWt,
 			ctypes.c_int(NP),
 			ctypes.c_int(NN),
 			StpFtrsId,
-			ctypes.c_int( floor(self.pTree.fracFtrs * F) ),
+			ctypes.c_int( floor(self.pTree.FracFtrs * F) ),
 			ctypes.c_double(prior),
 			ctypes.c_int(self.pTree.nBins),
 			ctypes.c_int(self.pTree.nThreads),
@@ -109,22 +257,12 @@ class BinaryTree(object):
 
 
 
-	def Train(self, data, **pTree):
+	def Train(self, data):
 		'''
 			Reference to piotr dollar's Computer Vision matlab toolbox
 
 			INPUTS
-				data       - (dict)data for training tree.
-				dict key(type: str):
-					PosFtrsVec         - [NPxF] negative feature vectors(Each row represents a sample, and each column represents a feature)
-					NegFtrsVec         - [NNxF] positive feature vectors(Each row represents a sample, and each column represents a feature)
-					PosFtrsVecToC	   - [NPx1] positive feature row vectors pointer(used in BestStump.c)
-					NegFtrsVecToC	   - [NNx1] negative feature row vectors pointer(used in BestStump.c)
-					PosWt       - [NPx1] positive samples weights
-					NegWt       - [NNx1] negative samples weights
-					xMin       - [1xF] optional vals defining feature quantization
-					xMax      - [1xF] optional vals defining feature quantization
-					xType      - [] optional original data type for features
+				data       - Type: DataBin. Data for training tree.
 
 			OUTPUTS
 			tree       - (dict)learned decision tree model struct with the following keys:
@@ -137,107 +275,42 @@ class BinaryTree(object):
 			data       - data used for training tree (quantized version of input)
 			err        - decision tree training error
 		'''
-		#Deep copy a dict object
-		def DeepCopy(a):
-			if not isinstance(a, dict):
-				raise TypeError
-			b = dict()
-			for key in a:
-				#Object a has a method 'copy'
-				if 'copy' in dir(a[key]):
-					b[key] = a[key].copy()
-				else:
-					b[key] = a[key]
-			return b
+		if not isinstance(data, DataBin):
+			print('DataBin object type is required.')
+			raise TypeError
 
-		#Merge data parameters
-		data = DeepCopy(data)
-		#default parameters
-		data_dfs = {'PosFtrsVec': 'REQ', 'NegFtrsVec': 'REQ', 'PosWt': None, 'NegWt': None, 'xMin': None, 'xMax': None, 'xType': None}
-		data_dfs_copy = data_dfs.copy()
-		data_dfs_copy.update(data)
-		data = data_dfs_copy
-
-		#1D-Pointer array
-		if not isinstance(data.get('PosFtrsVecToC'), np.ndarray):
-			RowId = np.arange(data['PosFtrsVec'].shape[0])
-			data['PosFtrsVecToC'] = (data['PosFtrsVec'].ctypes.data + data['PosFtrsVec'].strides[0] * RowId).astype('uintp')
-			del(RowId)
-		if not isinstance(data.get('NegFtrsVecToC'), np.ndarray):
-			RowId = np.arange(data['NegFtrsVec'].shape[0])
-			data['NegFtrsVecToC'] = (data['NegFtrsVec'].ctypes.data + data['NegFtrsVec'].strides[0] * RowId).astype('uintp')
-			del(RowId)
+		if not data.Quant:
+			data.Quantize()
 
 		#Initialize arrays and data's weights
-		(NP, FP) = data['PosFtrsVec'].shape
-		(NN, FN) = data['NegFtrsVec'].shape
+		(NP, FP) = data.PosSamp.shape
+		(NN, FN) = data.NegSamp.shape
 		assert FP == FN
 		F = FP
 
 		tree = dict()
-		MaxNodes = (NP + FP) * 2									#Maximum number of nodes in BinaryTree
+		MaxNodes = 2**(self.pTree.MaxDepth + 1) - 1							#Maximum number of nodes in BinaryTree
 		tree['fids'] = np.zeros(MaxNodes, dtype = 'uint32')
-		tree['thrs'] = np.zeros(MaxNodes, dtype = 'float64')   		#dtype??
+		tree['thrs'] = np.zeros(MaxNodes, dtype = 'float64')   
 		tree['child'] = np.zeros(MaxNodes, dtype = 'uint32')
 		tree['hs'] = np.zeros(MaxNodes, dtype = 'float64')
 		tree['weights'] = np.zeros(MaxNodes, dtype = 'float64')
 		tree['depth'] = np.zeros(MaxNodes, dtype = 'uint32')
-
-		if not isinstance(data['PosWt'], np.ndarray):
-			data['PosWt'] = np.ones(NP, dtype = 'float64') / NP
-		if not isinstance(data['NegWt'], np.ndarray):
-			data['NegWt'] = np.ones(NN, dtype = 'float64') / NN
-		w = np.sum(data['PosWt']) + np.sum(data['NegWt'])
-		if abs(w - 1) > 1e-3:
-			data['PosWt'] /= w
-			data['NegWt'] /= w
-
 		errs = np.zeros(MaxNodes, dtype = 'float64')
-
-		#Quantize data
-		if not (str(data['PosFtrsVec'].dtype) == 'uint8' and str(data['NegFtrsVec'].dtype) == 'uint8'):
-			#find minimum values of each feature
-			PosxMin = np.min(data['PosFtrsVec'], axis = 0)
-			NegxMin = np.min(data['NegFtrsVec'], axis = 0)
-			xMin = np.where(PosxMin < NegxMin, PosxMin, NegxMin)
-			del(PosxMin)
-			del(NegxMin)
-
-			PosxMax = np.max(data['PosFtrsVec'], axis = 0)
-			NegxMax = np.max(data['NegFtrsVec'], axis = 0)
-			xMax = np.where(PosxMax > NegxMax, PosxMax, NegxMax)
-			del(PosxMax)
-			del(NegxMax)
-
-			#Quantize to 0 ~ nBins-1
-			data['xMin'] = xMin
-			data['xMax'] = xMax
-			data['xType'] = str(data['PosFtrsVec'].dtype)
-			data['PosFtrsVec'] = (data['PosFtrsVec'] - xMin) / (xMax - xMin) * (self.pTree.nBins - 1)
-			data['PosFtrsVec'] = data['PosFtrsVec'].astype('uint8')
-			data['NegFtrsVec'] = (data['NegFtrsVec'] - xMin) / (xMax - xMin) * (self.pTree.nBins - 1)
-			data['NegFtrsVec'] = data['NegFtrsVec'].astype('uint8')
-			#Rearrange 1D-Pointer array 
-			RowId = np.arange(data['PosFtrsVec'].shape[0])
-			data['PosFtrsVecToC'] = (data['PosFtrsVec'].ctypes.data + data['PosFtrsVec'].strides[0] * RowId).astype('uintp')
-			del(RowId)
-			RowId = np.arange(data['NegFtrsVec'].shape[0])
-			data['NegFtrsVecToC'] = (data['NegFtrsVec'].ctypes.data + data['NegFtrsVec'].strides[0] * RowId).astype('uintp')
-			del(RowId)
 
 		#Train Decision Tree
 		CurNode = 0                        #Current Node's id
 		LastNode = 1					   #Last Node's id that has been yield
-		NodePosWtList = [[]] * MaxNodes	   #an assemble of nodes' samples weight(if a sample does not reaches the node, its weight = 0)
-		NodeNegWtList = [[]] * MaxNodes
-		NodePosWtList[0] = data['PosWt']
-		NodeNegWtList[0] = data['NegWt']
+		NodePosWtList = [None] * MaxNodes	   #an assemble of nodes' samples weight(if a sample does not reaches the node, its weight = 0)
+		NodeNegWtList = [None] * MaxNodes
+		NodePosWtList[0] = data.PosWt
+		NodeNegWtList[0] = data.NegWt
 
 		while CurNode < LastNode:
 			NodePosWt = NodePosWtList[CurNode]
 			NodeNegWt = NodeNegWtList[CurNode]
-			NodePosWtList[CurNode] = []
-			NodeNegWtList[CurNode] = []
+			NodePosWtList[CurNode] = None
+			NodeNegWtList[CurNode] = None
 			NodePosWtSum = np.sum(NodePosWt)
 			NodeNegWtSum = np.sum(NodeNegWt)
 			NodeWtSum = NodePosWtSum + NodeNegWtSum
@@ -254,14 +327,14 @@ class BinaryTree(object):
 			#tree['hs'][CurNode] = max(-4.0, min(4.0, alpha))
 
 			#Node's classification is nearly pure, node's depth is out of scale, sum of node samples' weight is out of scale
-			if (prior < 1e-3 or prior > 1 - 1e-3) or (tree['depth'][CurNode] >= self.pTree.maxDepth) or (NodeWtSum < self.pTree.minWeight) :
+			if (prior < 1e-3 or prior > 1 - 1e-3) or (tree['depth'][CurNode] >= self.pTree.MaxDepth) or (NodeWtSum < self.pTree.MinWeight) :
 				CurNode += 1
 				continue
 
 			#Find best tree stump
 			#wheather subsample the features or not
-			if self.pTree.fracFtrs < 1:
-				StpFtrsId = np.choice(np.arange(F), floor(self.pTree.fracFtrs * F)).astype('uint32')
+			if self.pTree.FracFtrs < 1:
+				StpFtrsId = np.choice(np.arange(F), floor(self.pTree.FracFtrs * F)).astype('uint32')
 			else: 
 				StpFtrsId = np.arange(F, dtype = 'uint32')
 
@@ -272,11 +345,11 @@ class BinaryTree(object):
 			BestFtrsId = StpFtrsId[BestFtrsId]
 
 			#Split node
-			LeftCldPosWt = data['PosFtrsVec'][:, BestFtrsId] < BestThrs 		#Node's left child's positive samples' weights
-			LeftCldNegWt = data['NegFtrsVec'][:, BestFtrsId] < BestThrs
+			LeftCldPosWt = data.QuantPosSamp[:, BestFtrsId] < BestThrs 		#Node's left child's positive samples' weights
+			LeftCldNegWt = data.QuantNegSamp[:, BestFtrsId] < BestThrs
 			if (np.any(LeftCldPosWt) or np.any(LeftCldNegWt))  and  (np.any(~LeftCldPosWt) or np.any(~LeftCldNegWt)):		#Invalid stump classifier
 				#Inverse quantization
-				BestThrs = xMin[BestFtrsId] + BestThrs * (xMax[BestFtrsId] - xMin[BestFtrsId]) / (self.pTree.nBins - 1)
+				BestThrs = data.xMin[BestFtrsId] + BestThrs * (data.xMax[BestFtrsId] - data.xMin[BestFtrsId]) / (self.pTree.nBins - 1)
 				NodePosWtList[LastNode] = LeftCldPosWt * NodePosWt
 				NodeNegWtList[LastNode] = LeftCldNegWt * NodeNegWt
 				NodePosWtList[LastNode + 1] = (~LeftCldPosWt) * NodePosWt
@@ -304,3 +377,8 @@ class BinaryTree(object):
 		self.tree = tree
 		self.err = err
 		return data
+
+
+	#Apply the binary decision tree and classify
+	def Apply(self):
+		pass
