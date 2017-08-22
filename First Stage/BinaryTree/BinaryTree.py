@@ -178,43 +178,40 @@ class BinaryTree(object):
 				MinWeight  - [.01] minimum sample weigth to allow split
 				FracFtrs   - [1] fraction of features numbers to sample for each node split
 				nThreads   - [16] max number of computational threads to use
+
+			BestStumpFunc	- BestStump.c interface function
+			ApplyFunc		- BinaryTreeApply.c interface function
 		'''
-		self.__slots__ = ('pTree', 'Tree', 'err')
+		self.__slots__ = ('pTree', 'BestStumpFunc', 'ApplyFunc', 'Tree', 'err')
 		try:
 			self.pTree = TrainParamBin()
 			for key, value in pTree.items():
 				setattr(self.pTree, key, value)
+
+			self.BestStumpFunc = None
+			self.ApplyFunc = None
+			self.Tree = None
+			self.err = None
 		except AttributeError as e:
 			print('No Such parameter:', key)
 			raise e
 		finally:
 			assert self.pTree.FracFtrs <= 1
 
-	#Given data, find the best stump classifier.
-	#Wrap the function in C. Not recommanded to use alone.
-	def BestStump(self, data, NodePosWt, NodeNegWt, StpFtrsId = None, prior = None):
-		if not isinstance(data, DataBin):
-			print('DataBin object type is required.')
+	#Load the C-function BestStump.c and construct ctype interface
+	def LoadBestStumpFunc(self, path = '.'):
+		if self.BestStumpFunc is not None:
+			return
+
+		if not isinstance(path, str):
+			print("Parameter 'path' is required to be str.")
 			raise TypeError
 
-		if not prior:
-			PosWtSum = np.sum(PosWt)
-			NegWtSum = np.sum(NegWt)
-			WtSum = PosWtSum + NegWtSum
-			prior = PosWtSum / WtSum
-
-		if not data.Quant:
-			data.Quantize()
-
-		if not isinstance(StpFtrsId, np.ndarray):
-			StpFtrsId = np.arange(data.PosSamp.shape[1], dtype = 'uint32')
-
-		#Load the C-function
+		f = npcl.load_library('BestStump', path)
 		pp = npcl.ndpointer(dtype = 'uintp', ndim = 1, flags = 'C')		#2D pointer(pointer to pointer)
 		double_p = npcl.ndpointer(dtype = 'float64', ndim = 1, flags = 'C')
 		uint32_p = npcl.ndpointer(dtype = 'uint32', ndim = 1, flags = 'C')
 		uint8_p = npcl.ndpointer(dtype = 'uint8', ndim = 1, flags = 'C')
-		f = npcl.load_library('BestStump', '.')
 		f.BestStump.restype = None
 		f.BestStump.argtypes = [
 			pp, 
@@ -231,13 +228,46 @@ class BinaryTree(object):
 			double_p, 
 			uint8_p
 			]
+		
+		self.BestStumpFunc = f.BestStump
+
+
+	#Given data, find the best stump classifier.
+	#Wrap the function in C. Not recommanded to use alone.
+	def BestStump(self, data, NodePosWt, NodeNegWt, StpFtrsId = None, prior = None):
+		if not isinstance(data, DataBin):
+			print('DataBin object type is required.')
+			raise TypeError
+
+		if not isinstance(NodePosWt, np.ndarray):
+			print('numpy.ndarray object type is required.')
+			raise TypeError
+
+		if not isinstance(NodeNegWt, np.ndarray):
+			print('numpy.ndarray object type is required.')
+			raise TypeError
+
+		if not prior:
+			PosWtSum = np.sum(PosWt)
+			NegWtSum = np.sum(NegWt)
+			WtSum = PosWtSum + NegWtSum
+			prior = PosWtSum / WtSum
+
+		if not data.Quant:
+			data.Quantize()
+
+		if not isinstance(StpFtrsId, np.ndarray):
+			StpFtrsId = np.arange(data.PosSamp.shape[1], dtype = 'uint32')
+
+		if self.BestStumpFunc is None:
+			self.LoadBestStumpFunc()
 
 		(NP, F) = data.PosSamp.shape
 		NN = data.NegSamp.shape[0]
 		StpThrs = np.zeros(floor(self.pTree.FracFtrs * F), dtype = 'uint8')
 		StpErrs = np.zeros(floor(self.pTree.FracFtrs * F), dtype = 'float64')
 		#Best Stump(For effiency, Coding in C)
-		f.BestStump(
+		self.BestStumpFunc(
 			data.PosSampITF,
 			data.NegSampITF,
 			NodePosWt,
@@ -282,7 +312,7 @@ class BinaryTree(object):
 		if not data.Quant:
 			data.Quantize()
 
-		#Initialize arrays and data's weights
+		#Initialize arrays
 		(NP, FP) = data.PosSamp.shape
 		(NN, FN) = data.NegSamp.shape
 		assert FP == FN
@@ -376,9 +406,73 @@ class BinaryTree(object):
 		#return
 		self.tree = tree
 		self.err = err
-		return data
 
 
-	#Apply the binary decision tree and classify
-	def Apply(self):
-		pass
+	def LoadApplyFunc(self, path = '.'):
+		if self.ApplyFunc is not None:
+			return
+
+		if not isinstance(path, str):
+			print("Parameter 'path' is required to be str.")
+			raise TypeError
+
+		f = npcl.load_library('BinaryTreeApply', '.')
+		pp = npcl.ndpointer(dtype = 'uintp', ndim = 1, flags = 'C')		#2D pointer(pointer to pointer)
+		double_p = npcl.ndpointer(dtype = 'float64', ndim = 1, flags = 'C')
+		uint32_p = npcl.ndpointer(dtype = 'uint32', ndim = 1, flags = 'C')
+		uint8_p = npcl.ndpointer(dtype = 'uint8', ndim = 1, flags = 'C')
+		f.BinaryTreeApply.restype = None
+		f.BinaryTreeApply.argtypes = [
+			pp,
+			ctypes.c_uint32,
+			uint32_p,
+			double_p,
+			uint32_p,
+			double_p,
+			ctypes.c_int,
+			double_p
+		]
+
+		self.ApplyFunc = f.BinaryTreeApply
+
+
+	#Apply the binary decision tree and classify the given data
+	#
+	def Apply(self, data):
+		if self.tree is None:
+			print('Binary tree has not been trained.')
+			raise ValueError
+
+		if not isinstance(data, np.ndarray):
+			print('numpy.ndarray type is required.')
+			raise TypeError
+
+		if data.ndim == 1:
+			data = data.copy()
+			data = data.reshape(-1, 1)
+		elif data.ndim > 2:
+			print('2-dimension data is required.')
+			raise ValueError
+
+		RowId = np.arange(data.shape[0])
+		dataITF = (data.ctypes.data + RowId * data.strides[0]).astype('uintp')
+
+		if self.ApplyFunc is None:
+			self.LoadApplyFunc()
+
+		results = np.arange(data.shape[0], dtype = 'float64')
+
+		self.ApplyFunc(
+			dataITF, 
+			ctypes.c_uint32(data.shape[0]),
+			self.tree['fids'],
+			self.tree['thrs'],
+			self.tree['child'],
+			self.tree['hs'],
+			ctypes.c_int(self.pTree.nThreads),
+			results
+			)
+
+		return results
+
+
