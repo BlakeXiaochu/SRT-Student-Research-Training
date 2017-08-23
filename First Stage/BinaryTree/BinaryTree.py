@@ -5,15 +5,17 @@ import ctypes
 
 #Trainning parameters class, used for storing trainning parameters.
 class TrainParamBin(object):
+	#Limit the parameters
+	__slots__ = ('nBins', 'MaxDepth', 'MinWeight', 'FracFtrs', 'nThreads')
+
 	def __init__(self):
-		#Limit the parameters
-		self.__slots__ = ('nBins', 'MaxDepth', 'MinWeight', 'FracFtrs', 'nThreads')
 		#Default
 		self.nBins = 256
 		self.MaxDepth = 1
 		self.MinWeight = 0.01
 		self.FracFtrs = 1.0
 		self.nThreads = 16
+
 
 #Data bin class, used for storing trainning data.
 class DataBin(object):
@@ -32,9 +34,10 @@ class DataBin(object):
 			Quant 		- Quantization flag
 			nBins 		- Number of Quantization bins
 	'''
+	__slots__ = ('PosSamp', 'NegSamp', 'PosWt', 'NegWt', 'PosSampITF', 'NegSampITF', 'QuantPosSamp', 'QuantNegSamp', 'xMin', 'xMax', 'Quant', 'nBins')
+
 	def __init__(self, PosSamp, NegSamp, PosWt = None, NegWt = None, nBins = 256):
-		self.__slots__ = ('PosSamp', 'NegSamp', 'PosWt', 'NegWt', 'PosSampITF', 'NegSampITF', 'QuantPosSamp', 'QuantNegSamp', 'xMin', 'xMax', 'Quant', 'nBins')
-		#Check data type
+		#Check type
 		if isinstance(PosSamp, np.ndarray):
 			self.PosSamp = PosSamp
 		else:
@@ -91,7 +94,7 @@ class DataBin(object):
 		self.Quant = False
 
 
-	#Construct a brand-new data bin
+	#Construct a brand-new data bin(Deep copy).
 	def Copy(self):
 		NewDataBin = DataBin(self.PosSamp.copy(), self.NegSamp.copy(), self.PosWt.copy(), self.NegWt.copy(), self.nBins)
 
@@ -126,6 +129,22 @@ class DataBin(object):
 		del(RowId)
 
 		return NewDataBin
+
+
+	#Shallow copy
+	def __copy__(self):
+		NewDataBin = DataBin(self.PosSamp, self.NegSamp, self.PosWt, self.NegWt, self.nBins)
+		NewDataBin.QuantPosSamp = self.QuantPosSamp
+		NewDataBin.QuantNegSamp = self.QuantNegSamp
+		NewDataBin.xMin = self.xMin
+		NewDataBin.xMax = self.xMax
+		NewDataBin.Quant = self.Quant
+		NewDataBin.PosSampITF = self.PosSampITF
+		NewDataBin.NegSampITF = self.NegSampITF
+
+
+	def __deepcopy__(self):
+		return self.Copy()
 
 
 	def Quantize(self):
@@ -168,6 +187,8 @@ class DataBin(object):
 
 
 class BinaryTree(object):
+	__slots__ = ('pTree', 'BestStumpFunc', 'ApplyFunc', 'Tree', 'Err')
+
 	#Initialize trainning parameters
 	def __init__(self, **pTree):
 		'''	
@@ -182,7 +203,6 @@ class BinaryTree(object):
 			BestStumpFunc	- BestStump.c interface function
 			ApplyFunc		- BinaryTreeApply.c interface function
 		'''
-		self.__slots__ = ('pTree', 'BestStumpFunc', 'ApplyFunc', 'Tree', 'err')
 		try:
 			self.pTree = TrainParamBin()
 			for key, value in pTree.items():
@@ -191,7 +211,7 @@ class BinaryTree(object):
 			self.BestStumpFunc = None
 			self.ApplyFunc = None
 			self.Tree = None
-			self.err = None
+			self.Err = None
 		except AttributeError as e:
 			print('No Such parameter:', key)
 			raise e
@@ -295,7 +315,7 @@ class BinaryTree(object):
 				data       - Type: DataBin. Data for training tree.
 
 			OUTPUTS
-			tree       - (dict)learned decision tree model struct with the following keys:
+			Tree       - (dict)learned decision tree model struct with the following keys:
 				fids       - [Kx1] feature ids for each node
 				thrs       - [Kx1] threshold corresponding to each fid
 				child      - [Kx1] index of child for each node (1-indexed)
@@ -303,7 +323,7 @@ class BinaryTree(object):
 				weights    - [Kx1] total sample weight at each node
 				depth      - [Kx1] depth of each node
 			data       - data used for training tree (quantized version of input)
-			err        - decision tree training error
+			Err        - decision tree training error
 		'''
 		if not isinstance(data, DataBin):
 			print('DataBin object type is required.')
@@ -318,14 +338,14 @@ class BinaryTree(object):
 		assert FP == FN
 		F = FP
 
-		tree = dict()
+		Tree = dict()
 		MaxNodes = 2**(self.pTree.MaxDepth + 1) - 1							#Maximum number of nodes in BinaryTree
-		tree['fids'] = np.zeros(MaxNodes, dtype = 'uint32')
-		tree['thrs'] = np.zeros(MaxNodes, dtype = 'float64')   
-		tree['child'] = np.zeros(MaxNodes, dtype = 'uint32')
-		tree['hs'] = np.zeros(MaxNodes, dtype = 'float64')
-		tree['weights'] = np.zeros(MaxNodes, dtype = 'float64')
-		tree['depth'] = np.zeros(MaxNodes, dtype = 'uint32')
+		Tree['fids'] = np.zeros(MaxNodes, dtype = 'uint32')
+		Tree['thrs'] = np.zeros(MaxNodes, dtype = 'float64')   
+		Tree['child'] = np.zeros(MaxNodes, dtype = 'uint32')
+		Tree['hs'] = np.zeros(MaxNodes, dtype = 'float64')
+		Tree['weights'] = np.zeros(MaxNodes, dtype = 'float64')
+		Tree['depth'] = np.zeros(MaxNodes, dtype = 'uint32')
 		errs = np.zeros(MaxNodes, dtype = 'float64')
 
 		#Train Decision Tree
@@ -345,19 +365,19 @@ class BinaryTree(object):
 			NodeNegWtSum = np.sum(NodeNegWt)
 			NodeWtSum = NodePosWtSum + NodeNegWtSum
 
-			tree['weights'][CurNode] = NodeWtSum
+			Tree['weights'][CurNode] = NodeWtSum
 			prior = NodePosWtSum / NodeWtSum
 			errs[CurNode] = min(prior, 1 - prior)
 			constant = np.e**8 / (1 + np.e**8)
 			alpha =  4.0 if (prior > constant) else \
 					-4.0 if (prior < 1 - constant) else \
 					0.5 * log(prior / (1 - prior))
-			tree['hs'][CurNode] = alpha
+			Tree['hs'][CurNode] = alpha
 			#alpha = 0.5 * log(prior / (1 - prior))
 			#tree['hs'][CurNode] = max(-4.0, min(4.0, alpha))
 
 			#Node's classification is nearly pure, node's depth is out of scale, sum of node samples' weight is out of scale
-			if (prior < 1e-3 or prior > 1 - 1e-3) or (tree['depth'][CurNode] >= self.pTree.MaxDepth) or (NodeWtSum < self.pTree.MinWeight) :
+			if (prior < 1e-3 or prior > 1 - 1e-3) or (Tree['depth'][CurNode] >= self.pTree.MaxDepth) or (NodeWtSum < self.pTree.MinWeight) :
 				CurNode += 1
 				continue
 
@@ -385,27 +405,27 @@ class BinaryTree(object):
 				NodePosWtList[LastNode + 1] = (~LeftCldPosWt) * NodePosWt
 				NodeNegWtList[LastNode + 1] = (~LeftCldNegWt) * NodeNegWt
 
-				tree['thrs'][CurNode] = BestThrs
-				tree['fids'][CurNode] = BestFtrsId
-				tree['child'][CurNode] = LastNode
-				tree['depth'][LastNode : LastNode + 2] = tree['depth'][CurNode] + 1
+				Tree['thrs'][CurNode] = BestThrs
+				Tree['fids'][CurNode] = BestFtrsId
+				Tree['child'][CurNode] = LastNode
+				Tree['depth'][LastNode : LastNode + 2] = Tree['depth'][CurNode] + 1
 
 				LastNode += 2
 
 			CurNode += 1
 
 		#Modefy parameter 'tree':
-		tree['fids'] = tree['fids'][0:LastNode].copy()
-		tree['thrs'] = tree['thrs'][0:LastNode].copy()
-		tree['child'] = tree['child'][0:LastNode].copy()
-		tree['hs'] = tree['hs'][0:LastNode].copy()
-		tree['weights'] = tree['weights'][0:LastNode].copy()
-		tree['depth'] = tree['depth'][0:LastNode].copy()
-		err = np.sum(errs[0:LastNode] * tree['weights'] * (tree['child'] == 0))				#Sum up the leaf nodes' error
+		Tree['fids'] = Tree['fids'][0:LastNode].copy()
+		Tree['thrs'] = Tree['thrs'][0:LastNode].copy()
+		Tree['child'] = Tree['child'][0:LastNode].copy()
+		Tree['hs'] = Tree['hs'][0:LastNode].copy()
+		Tree['weights'] = Tree['weights'][0:LastNode].copy()
+		Tree['depth'] = Tree['depth'][0:LastNode].copy()
+		Err = np.sum(errs[0:LastNode] * Tree['weights'] * (Tree['child'] == 0))				#Sum up the leaf nodes' error
 
 		#return
-		self.tree = tree
-		self.err = err
+		self.Tree = Tree
+		self.Err = Err
 
 
 	def LoadApplyFunc(self, path = '.'):
@@ -439,7 +459,7 @@ class BinaryTree(object):
 	#Apply the binary decision tree and classify the given data
 	#
 	def Apply(self, data):
-		if self.tree is None:
+		if self.Tree is None:
 			print('Binary tree has not been trained.')
 			raise ValueError
 
@@ -465,10 +485,10 @@ class BinaryTree(object):
 		self.ApplyFunc(
 			dataITF, 
 			ctypes.c_uint32(data.shape[0]),
-			self.tree['fids'],
-			self.tree['thrs'],
-			self.tree['child'],
-			self.tree['hs'],
+			self.Tree['fids'],
+			self.Tree['thrs'],
+			self.Tree['child'],
+			self.Tree['hs'],
 			ctypes.c_int(self.pTree.nThreads),
 			results
 			)
