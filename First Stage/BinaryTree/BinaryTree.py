@@ -1,3 +1,4 @@
+import os
 from math import log, floor
 from numpy import ctypeslib as npcl
 import numpy as np
@@ -219,9 +220,12 @@ class BinaryTree(object):
 			assert self.pTree.FracFtrs <= 1
 
 	#Load the C-function BestStump.c and construct ctype interface
-	def LoadBestStumpFunc(self, path = '.'):
+	def LoadBestStumpFunc(self, path = None):
 		if self.BestStumpFunc is not None:
 			return
+
+		if path is None:
+			path = os.path.dirname( os.path.abspath(__file__) )
 
 		if not isinstance(path, str):
 			print("Parameter 'path' is required to be str.")
@@ -428,15 +432,18 @@ class BinaryTree(object):
 		self.Err = Err
 
 
-	def LoadApplyFunc(self, path = '.'):
+	def LoadApplyFunc(self, path = None):
 		if self.ApplyFunc is not None:
 			return
+
+		if path is None:
+			path = os.path.dirname( os.path.abspath(__file__) )
 
 		if not isinstance(path, str):
 			print("Parameter 'path' is required to be str.")
 			raise TypeError
 
-		f = npcl.load_library('BinaryTreeApply', '.')
+		f = npcl.load_library('BinaryTreeApply', path)
 		pp = npcl.ndpointer(dtype = 'uintp', ndim = 1, flags = 'C')		#2D pointer(pointer to pointer)
 		double_p = npcl.ndpointer(dtype = 'float64', ndim = 1, flags = 'C')
 		uint32_p = npcl.ndpointer(dtype = 'uint32', ndim = 1, flags = 'C')

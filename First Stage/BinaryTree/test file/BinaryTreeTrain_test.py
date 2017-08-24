@@ -1,10 +1,10 @@
-from BinaryTreeTrain import *
+from BinaryTree import *
 from numpy import ctypeslib as npcl
 import numpy as np
 import ctypes
 
 data = dict()
-pTree = {'nBins': 256, 'maxDepth': 2, 'minWeight': 0.01, 'fracFtrs': 1, 'nThreads': 16}
+pTree = {'nBins': 256, 'MaxDepth': 2, 'MinWeight': 0.01, 'FracFtrs': 1, 'nThreads': 16}
 
 data['PosFtrsVec'] = np.array([
 	[14.23, 1.71,2.43,15.6,127,2.8,3.06,.28,2.29,5.64,1.04,3.92,1065],
@@ -129,12 +129,13 @@ data['NegFtrsVec'][:, 10] += 0.3
 data['NegFtrsVec'][:, 11] += 1.6
 data['NegFtrsVec'][:, 12] += 400
 
-# print(data['PosFtrsVec'])
-# print(data['NegFtrsVec'])
-# exit()
+
+data_bin = DataBin(data['PosFtrsVec'], data['NegFtrsVec'])
+data_bin.Quantize()
+a = data_bin.Copy()
 
 Tree1 = BinaryTree(**pTree)
-data = Tree1.Train(data)
+data = Tree1.Train(a)
 
 print(Tree1.tree)
 print(Tree1.err)

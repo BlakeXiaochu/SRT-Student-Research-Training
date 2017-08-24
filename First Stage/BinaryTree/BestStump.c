@@ -69,7 +69,7 @@ DLL_EXPORT void BestStump(uint8** PosFtrsVec, uint8** NegFtrsVec, double* PosWt,
 	double PosWtCumSum[256], NegWtCumSum[256];
 	
 	#ifdef USEOMP
-	nThreads = min(nThreads,omp_get_max_threads());
+		nThreads = min(nThreads,omp_get_max_threads());
 	#pragma omp parallel for num_threads(nThreads)
 	#endif
 

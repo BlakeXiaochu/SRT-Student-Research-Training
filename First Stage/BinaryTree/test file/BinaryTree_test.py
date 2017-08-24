@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../')
 from BinaryTree import *
 from numpy import ctypeslib as npcl
 import numpy as np
@@ -135,9 +137,9 @@ data_bin.Quantize()
 a = data_bin.Copy()
 
 Tree1 = BinaryTree(**pTree)
-data = Tree1.Train(a)
+Tree1.Train(a)
 
-print(Tree1.tree)
-print(Tree1.err)
+results = Tree1.Apply(data['PosFtrsVec'])
 
+print(Tree1.Tree)
 
