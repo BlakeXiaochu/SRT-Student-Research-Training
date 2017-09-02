@@ -6,9 +6,9 @@ import numpy as np
 import ctypes
 
 data = dict()
-pTree = {'nBins': 256, 'MaxDepth': 2, 'MinWeight': 0.01, 'FracFtrs': 1, 'nThreads': 16}
+pTree = {'nBins': 256, 'maxDepth': 2, 'minWeight': 0.01, 'fracFtrs': 1, 'nThreads': 16}
 
-data['PosFtrsVec'] = np.array([
+data['posFtrsVec'] = np.array([
 	[14.23, 1.71,2.43,15.6,127,2.8,3.06,.28,2.29,5.64,1.04,3.92,1065],
 	[13.2,  1.78,2.14,11.2,100,2.65,2.76,.26,1.28,4.38,1.05,3.4,1050],
 	[13.16, 2.36,2.67,18.6,101,2.8,3.24,.3,2.81,5.68,1.03,3.17,1185],
@@ -70,7 +70,7 @@ data['PosFtrsVec'] = np.array([
 	[13.72, 1.43,2.5,16.7,108,3.4,3.67,.19,2.04,6.8,.89,2.87,1285]
 	], dtype = 'float64')
 
-data['NegFtrsVec'] = np.array([
+data['negFtrsVec'] = np.array([
 	[12.86,1.35,2.32,18,122,1.51,1.25,.21,.94,4.1,.76,1.29,630],
 	[12.88,2.99,2.4,20,104,1.3,1.22,.24,.83,5.4,.74,1.42,530],
 	[12.81,2.31,2.4,24,98,1.15,1.09,.27,.83,5.7,.66,1.36,560],
@@ -121,25 +121,25 @@ data['NegFtrsVec'] = np.array([
 	[14.13,4.1,2.74,24.5,96,2.05,.76,.56,1.35,9.2,.61,1.6,560]
 	], dtype = 'float64')
 
-data['NegFtrsVec'][:, 1] -= 1
-data['NegFtrsVec'][:, 3] -= 3
-data['NegFtrsVec'][:, 5] += 1
-data['NegFtrsVec'][:, 6] += 2
-data['NegFtrsVec'][:, 7] -= 0.2
-data['NegFtrsVec'][:, 8] += 1
-data['NegFtrsVec'][:, 10] += 0.3
-data['NegFtrsVec'][:, 11] += 1.6
-data['NegFtrsVec'][:, 12] += 400
+data['negFtrsVec'][:, 1] -= 1
+data['negFtrsVec'][:, 3] -= 3
+data['negFtrsVec'][:, 5] += 1
+data['negFtrsVec'][:, 6] += 2
+data['negFtrsVec'][:, 7] -= 0.2
+data['negFtrsVec'][:, 8] += 1
+data['negFtrsVec'][:, 10] += 0.3
+data['negFtrsVec'][:, 11] += 1.6
+data['negFtrsVec'][:, 12] += 400
 
 
-data_bin = DataBin(data['PosFtrsVec'], data['NegFtrsVec'])
-data_bin.Quantize()
-a = data_bin.Copy()
+data_bin = DataBin(data['posFtrsVec'], data['negFtrsVec'])
+data_bin.quantize()
+a = data_bin.deepCopy()
 
 Tree1 = BinaryTree(**pTree)
-Tree1.Train(a)
+Tree1.train(a)
 
-results = Tree1.Apply(data['PosFtrsVec'])
+results = Tree1.apply(data['posFtrsVec'])
 
-print(Tree1.Tree)
+print(Tree1.tree)
 
