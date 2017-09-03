@@ -186,6 +186,11 @@ class DataBin(object):
 		return
 
 
+	#update the samples weight
+	def updateWt(self):
+		pass
+
+
 
 class BinaryTree(object):
 	__slots__ = ('pTree', 'bestStumpFunc', 'applyFun', 'tree', 'err')
@@ -203,6 +208,18 @@ class BinaryTree(object):
 
 			bestStumpFunc	- bestStump.c interface function
 			applyFun		- BinaryTreeApply.c interface function
+
+			tree 	   - Trained decision tree.
+			key(str):
+				fids		- the ids of features
+				thrs 		- corresponding thresholds of features
+				child 		- left child node of each tree node
+				hs 			- misclassified samples log ratio
+				weights		- the sum of trainning samples' weight of each nodes
+				depth 		- depth of each tree node
+
+			err 		- weighted mean sum of misclassified samples
+
 		'''
 		try:
 			self.pTree = TrainParamBin()
