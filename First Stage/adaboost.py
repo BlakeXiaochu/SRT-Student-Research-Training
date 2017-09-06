@@ -4,9 +4,9 @@ from BinaryTree import *
 import numpy as np
 from math import log
 
-class strongClassifier(object):
+class StrongClassifier(object):
 	"""
-		docstring for strongClassifier
+		docstring for StrongClassifier
 
 		parameters:
 			clsNum	- The number of weak classifiers(binary decision tree)
@@ -40,18 +40,32 @@ class strongClassifier(object):
 		self._weakClsList = []
 		self.weakClsWt = []
 		for i in range(self.clsNum):
-			tree = BinaryTree(self.pTree)
-			tree.train(data)
-			self._weakClsList.append(tree)
+			binaryTree = BinaryTree(self.pTree)
+			binaryTree.train(data)
 			constant = np.e**10 / (1 + np.e**10)
-			alpha =  5.0 if (tree.err < 1 - constant) else \
-					-5.0 if (tree.err > constant) else \
-					0.5 * log((1 - tree.err) / tree.err)
+			alpha =  5.0 if (binaryTree.err < 1 - constant) else \
+					-5.0 if (binaryTree.err > constant) else \
+					0.5 * log((1 - binaryTree.err) / binaryTree.err)
+
+			#err >= 0.5? how?
+			if alpha <= 0:
+				print('Stop early.')
+				self.clsNum = i
+				break
+
+			#??
+			binaryTree.tree['hs'] *= alpha
 			self.weakClsWt.append(alpha)
+			self._weakClsList.append(binaryTree)
 
 			#use trained weak classifier to classify
 			posResult = tree.apply(data.posSamp)
 			negResult = tree.apply(data.negSamp)
 
 			#update samples weight and normalize
+			data.posWt *= 
+			data.negWt *= 
 
+			#loss function
+			loss = np.sum(data.posWt + data.negWt)
+			print('loss =', loss)
