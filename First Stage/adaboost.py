@@ -25,6 +25,7 @@ class StrongClassifier(object):
 		self.weakClsWt = None
 		self.discrete = True
 
+
 	#train the strong classifier through adaboost(discrete or real)
 	def adaboostTrain(self, data, discrete = True):
 		if self._weakClsList is not None:
@@ -51,12 +52,12 @@ class StrongClassifier(object):
 			self.weakClsWt = None
 
 		for i in range(self.clsNum):
-			binaryTree = BinaryTree(self.pTree)
+			binaryTree = BinaryTree(**self.pTree)
 			binaryTree.train(data)
 
 			#if discrete adaboost, classfication output is 1, -1
 			if discrete:
-				binaryTree.tree['hs'] = (binaryTree.tree['hs'] > 0) * 2 - 1
+				binaryTree.tree['hs'] = (binaryTree.tree['hs'] > 0) * 2.0 - 1
 
 				constant = np.e**10 / (1 + np.e**10)
 				alpha =  5.0 if (binaryTree.err < 1 - constant) else \
@@ -65,7 +66,7 @@ class StrongClassifier(object):
 
 				self.weakClsWt.append(alpha)
 			else:
-				alpha = 1
+				alpha = 1.0
 
 			self._weakClsList.append(binaryTree)
 
@@ -78,8 +79,8 @@ class StrongClassifier(object):
 			data.negWt *= np.exp(alpha * negResult)
 
 			#loss function
-			loss = np.sum(data.posWt + data.negWt)
-			print('weak classifier%d, loss = %s' % (i, format(loss, '.3e')))
+			loss = np.sum(data.posWt) + np.sum(data.negWt)
+			print('weak classifier%d, alpha = %s, loss = %s' % (i, format(alpha, '.3e'), format(loss, '.3e')))
 
 			#samples weight normalization
 			data.posWt /= loss
@@ -90,3 +91,8 @@ class StrongClassifier(object):
 				print('Stop early.')
 				self.clsNum = i + 1
 				break
+
+
+		#apply decsion forest
+		def apply(self):
+			pass
