@@ -60,7 +60,7 @@ class DataBin(object):
 			self.posWt = posWt
 		elif posWt is None:
 			NP = self.posSamp.shape[0]
-			self.posWt = np.ones(NP, dtype = 'float64') / NP
+			self.posWt = np.ones(NP, dtype = 'float64') / NP / 2
 		else:
 			print('np.ndarray is required.')
 			raise TypeError
@@ -69,7 +69,7 @@ class DataBin(object):
 			self.negWt = negWt
 		elif negWt is None:
 			NN = self.negSamp.shape[0]
-			self.negWt = np.ones(NN, dtype = 'float64') / NN
+			self.negWt = np.ones(NN, dtype = 'float64') / NN / 2
 		else:
 			print('np.ndarray is required.')
 			raise TypeError
