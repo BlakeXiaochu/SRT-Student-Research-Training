@@ -165,11 +165,11 @@ class DataBin(object):
 		del(NegxMax)
 
 		#quantize to 0 ~ nBins-1
-		quantPosSamp = (self.posSamp - self.xMin) / (self.xMax - self.xMin) * (self.nBins - 1)
+		quantPosSamp = (self.posSamp - self.xMin) / (self.xMax - self.xMin) * (self.nBins - 1.0)
 		self.quantPosSamp = quantPosSamp.astype('uint8')
 		del(quantPosSamp)
 
-		quantNegSamp = (self.negSamp - self.xMin) / (self.xMax - self.xMin) * (self.nBins - 1)
+		quantNegSamp = (self.negSamp - self.xMin) / (self.xMax - self.xMin) * (self.nBins - 1.0)
 		self.quantNegSamp = quantNegSamp.astype('uint8')
 		del(quantNegSamp)
 

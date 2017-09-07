@@ -51,6 +51,9 @@ class StrongClassifier(object):
 		else:
 			self.weakClsWt = None
 
+		#for caculate loss function
+		posCumCls = np.zeros(data.posWt.shape[0])
+		negCumCls = np.zeros(data.negWt.shape[0]);
 		for i in range(self.clsNum):
 			binaryTree = BinaryTree(**self.pTree)
 			binaryTree.train(data)
@@ -75,12 +78,16 @@ class StrongClassifier(object):
 			negResult = binaryTree.apply(data.negSamp)
 
 			#update samples weight
-			data.posWt *= np.exp(-alpha * posResult)
-			data.negWt *= np.exp(alpha * negResult)
+			posCumCls += posResult*alpha
+			negCumCls += negResult*alpha
+			data.posWt = np.exp(-posCumCls) / data.posWt.shape[0] / 2
+			data.negWt = np.exp(negCumCls) / data.negWt.shape[0] / 2
+			#data.posWt *= np.exp(-alpha * posResult)
+			#data.negWt *= np.exp(alpha * negResult)
 
 			#loss function
 			loss = np.sum(data.posWt) + np.sum(data.negWt)
-			print('weak classifier%d, alpha = %s, loss = %s' % (i, format(alpha, '.3e'), format(loss, '.3e')))
+			print('weak classifier%d: err = %s, alpha = %s, loss = %s' % (i, format(binaryTree.err, '.3e'), format(alpha, '.3e'), format(loss, '.3e')))
 
 			#samples weight normalization
 			data.posWt /= loss
