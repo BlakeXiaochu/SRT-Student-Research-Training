@@ -39,11 +39,11 @@ class KCFtracker(object):
 
 		#the regression targets y
 		s = np.sqrt(imgSize[0] * imgSize[1]) / self.coefY	#spatial bandwidth s, controling The regression targets y simply follow a Gaussian function
-		coord = np.mgrid[-np.floor(imgSize[0]/2):np.floor(imgSize[0]/2 + 1), -np.floor(imgSize[1]/2):np.floor(imgSize[1]/2 + 1)]
+		coord = np.mgrid[-int(imgSize[0]/2):int(imgSize[0]/2 + 0.5), -int(imgSize[1]/2):int(imgSize[1]/2 + 0.5)]
 		coordX = coord[0, :, :]
 		coordY = coord[1, :, :]
 		y = np.exp( -0.5 * (coordX**2 + coordY**2) / (s**2) )
-		y = np.roll(y, (int(imgSize[0]/2) + 1, int(imgSize[1]/2) + 1), axis = (0, 1))
+		y = np.roll(y, (int(imgSize[0]/2 + 0.5), int(imgSize[1]/2 + 0.5)), axis = (0, 1))
 
 		#regression
 		k = kernelCorrelation(paddingRegion, paddingRegion, method, **kw)
