@@ -101,5 +101,32 @@ class StrongClassifier(object):
 
 
 		#apply decsion forest
-		def apply(self):
-			pass
+		def apply(self, data):
+			"""
+				data 	-the arrays represent the fearture of img patch(es)
+			"""
+
+			if self._weakClsList is None:
+				print('strong classifier is not trained.')
+				raise Exception
+
+			if not isinstance(data, np.ndarray):
+				print('numpy.ndarray type is required.')
+				raise TypeError
+
+			if data.ndim == 1:
+				data = data.copy()
+				data = data.reshape(-1, 1)
+			elif data.ndim > 2:
+				print('1 or 2 dimension data is required.')
+				raise ValueError
+
+			clsResults = np.zeros(data.shape[0], 'float64')
+			if self.discrete:
+				for i in self.clsNum:
+					clsResults += (self.weakClsWt[i] * self._weakClsList[i].apply(data) )
+			else:
+				for i in self.clsNum:
+					clsResults += self._weakClsList[i].apply(data)
+
+			return clsResults

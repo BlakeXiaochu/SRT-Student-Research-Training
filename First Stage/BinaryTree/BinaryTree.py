@@ -485,7 +485,7 @@ class BinaryTree(object):
 	def apply(self, data):
 		if self.tree is None:
 			print('Binary tree has not been trained.')
-			raise ValueError
+			raise Exception
 
 		if not isinstance(data, np.ndarray):
 			print('numpy.ndarray type is required.')
@@ -495,7 +495,7 @@ class BinaryTree(object):
 			data = data.copy()
 			data = data.reshape(-1, 1)
 		elif data.ndim > 2:
-			print('2-dimension data is required.')
+			print('1 or 2 dimension data is required.')
 			raise ValueError
 
 		rowId = np.arange(data.shape[0])
