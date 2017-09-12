@@ -4,12 +4,13 @@ class KCFtracker(object):
 	"""
 		object tracker of KCF algorithm
 	"""
-	__slot__ = {'alphaf', 'coefY'}
+	__slot__ = {'alphaf', 'coefY', '_paddingTarget', '_cosWin'}
 	def __init__(self):
 		super(Tracker, self).__init__()
 		self.alphaf = None
 		#coeffient controling The regression targets y
-		self.coefY = 10			
+		self.coefY = 10
+		self	
 
 
 	#according to input image patch, train a regression tracker 
@@ -35,7 +36,10 @@ class KCFtracker(object):
 
 		#the input patches (either raw pixels or extracted feature channels) are weighted by a cosine window
 		cosWin = np.reshape(np.hamming(imgSize[0]), [-1, 1]) * np.reshape(np.hamming(imgSize[1]), [1, -1])
+		self._cosWin = cosWin
 		paddingRegion = paddingRegion * cosWin
+		self._paddingTarget = paddingRegion
+
 
 		#the regression targets y
 		s = np.sqrt(imgSize[0] * imgSize[1]) / self.coefY	#spatial bandwidth s, controling The regression targets y simply follow a Gaussian function
@@ -52,8 +56,8 @@ class KCFtracker(object):
 		return self.alphaf
 		
 
-	#run tracker
-	def detect(self, paddingRegion):
+	#run tracker, return relative position with the input image patch
+	def detect(self, paddingRegion, method, **kw):`
 		'''
 			
 		'''
@@ -61,7 +65,21 @@ class KCFtracker(object):
 			print('tracker has not been trained.')
 			raise Exception
 
-		pass
+		#kernel correlation
+		kxz = kernelCorrelation(paddingRegion * self._cosWin, self._paddingTarget, method, **kw)
+		kf = fft2(kxz)
+
+		#regression results in fourier domain
+		ff = kf * self.alphaf
+		f = np.real(ifft2(ff))
+		maxPosition = np.argmax(f)
+
+		#return relative position with the input image pacth
+		imgSize = paddingRegion.shape[0:2]
+		rePos = tuple(maxPosition // imgSize[1], maxPosition % imgSize[1])
+
+		return rePos
+
 
 
 	def kernelCorrelation(self, x1, x2, method, **kw):
@@ -69,16 +87,39 @@ class KCFtracker(object):
 			print('numpy.ndarray is required.')
 			raise TypeError
 
-		if (x1.ndim in (2, 3)) or (x2.ndim in (2, 3)):
-			print('2 or 3 dimension array is required.')
+		if (x1.ndim == 2) and (x2.ndim == 2):
+			single = 1
+		elif (x1.ndim == 3) and (x2.ndim == 3):
+			single = 0
+		else:
+			print('2 or 3 dimension arrays are required.')
 			raise ValueError
 
+		if x1.shape != x2.shape:
+			print('the input image pacthes do not match.')
+			raise ValueError
+
+		#linear regression
+		if method == 'linear':
+			if single:
+				x12DotProdf = np.conj(fft2(x1)) * fft2(x2)
+			else:
+				x12DotProdf = np.sum( np.conj(fft2(x1), axes = (0, 1)) * fft2(x2, axes = (0, 1)) , axis = 2)
+
+			x12DotProd = ifft2(x12DotProdf)
+			return x12DotProd
+
 		#Gaussian kernel
-		if method == 'gaussian':
+		elif method == 'gaussian':
 			sigma = kw['sigma']
 			x1Norm = np.sum(x1**2)
 			x2Norm = np.sum(x2**2)
-			x12DotProdf = np.sum( np.conj(fft2(x1), axes = (0, 1)) * fft2(x2, axes = (0, 1)) , axis = -1)
+
+			if single:
+				x12DotProdf = np.conj(fft2(x1)) * fft2(x2)
+			else:
+				x12DotProdf = np.sum( np.conj(fft2(x1), axes = (0, 1)) * fft2(x2, axes = (0, 1)) , axis = 2)
+
 			x12DotProd = ifft2(x12DotProdf)
 			k = np.exp( -(x1Norm + x2Norm - 2 * x12DotProd.real) / (sigma**2) / x12DotProd.size)
 			return k
@@ -87,7 +128,12 @@ class KCFtracker(object):
 		elif method == 'polynomial':
 			a = kw['a']
 			b = kw['b']
-			x12DotProdf = np.sum( np.conj(fft2(x1), axes = (0, 1)) * fft2(x2, axes = (0, 1)) , axis = -1)
+
+			if single:
+				x12DotProdf = np.conj(fft2(x1)) * fft2(x2)
+			else:
+				x12DotProdf = np.sum( np.conj(fft2(x1), axes = (0, 1)) * fft2(x2, axes = (0, 1)) , axis = 2)
+			
 			x12DotProd = ifft2(x12DotProdf)
 			k = (x12DotProd.real + a)**b
 			return k
