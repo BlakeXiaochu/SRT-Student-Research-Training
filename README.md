@@ -6,6 +6,6 @@ Including the implements of :
 - Adaboost algorithm
 - Binary decision tree(based on minimium classification error)
 
-##Second Stage
+## Second Stage
 Including the implements of :
 - KCF high-speed track algorithm
