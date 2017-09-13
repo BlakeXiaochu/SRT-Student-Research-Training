@@ -15,8 +15,7 @@ class StrongClassifier(object):
 	__slot__ = {'clsNum', 'pTree', '_weakClsList', 'weakClsWt', 'discrete'}
 	def __init__(self, clsNum, **pTree):
 		if not isinstance(clsNum, int):
-			print("parameter 'clsNum': type int is required")
-			raise TypeError
+			raise TypeError("parameter 'clsNum': type int is required")
 
 		self.clsNum = clsNum
 		self.pTree = pTree
@@ -31,14 +30,9 @@ class StrongClassifier(object):
 		if self._weakClsList is not None:
 			print('Strong classifier has been trained.')
 			return
-		
-		if not isinstance(data, DataBin):
-			print('DataBin object type is required.')
-			raise TypeError
 
 		if not isinstance(discrete, bool):
-			print('bool type is required.')
-			raise TypeError
+			raise TypeError('bool type is required.')
 		self.discrete = discrete
 
 		if not data.quant:
@@ -107,19 +101,7 @@ class StrongClassifier(object):
 			"""
 
 			if self._weakClsList is None:
-				print('strong classifier is not trained.')
-				raise Exception
-
-			if not isinstance(data, np.ndarray):
-				print('numpy.ndarray type is required.')
-				raise TypeError
-
-			if data.ndim == 1:
-				data = data.copy()
-				data = data.reshape(-1, 1)
-			elif data.ndim > 2:
-				print('1 or 2 dimension data is required.')
-				raise ValueError
+				raise Exception('strong classifier is not trained.')
 
 			clsResults = np.zeros(data.shape[0], 'float64')
 			if self.discrete:

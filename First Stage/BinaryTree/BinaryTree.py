@@ -42,18 +42,15 @@ class DataBin(object):
 		if isinstance(posSamp, np.ndarray):
 			self.posSamp = posSamp
 		else:
-			print('np.ndarray is required.')
-			raise TypeError
+			raise TypeError('argument 1: np.ndarray is required.')
 		if isinstance(negSamp, np.ndarray):
 			self.negSamp = negSamp
 		else:
-			print('np.ndarray is required.')
-			raise TypeError
+			raise TypeError('argument 2: np.ndarray is required.')
 
 		#Check the shape of Pos and Neg
 		if posSamp.shape[1] != negSamp.shape[1]:
-			print("Postive samples' shape", posSamp.shape, "does not match negtive samples'", negSamp.shape)
-			raise ValueError
+			raise ValueError("Postive samples' shape" + str(posSamp.shape) + "does not match negtive samples'" + str(negSamp.shape))
 
 		#Check data type
 		if isinstance(posWt, np.ndarray):
@@ -62,8 +59,7 @@ class DataBin(object):
 			NP = self.posSamp.shape[0]
 			self.posWt = np.ones(NP, dtype = 'float64') / NP / 2
 		else:
-			print('np.ndarray is required.')
-			raise TypeError
+			raise TypeError("argument 'posWt': np.ndarray is required.")
 
 		if isinstance(negWt, np.ndarray):
 			self.negWt = negWt
@@ -71,8 +67,7 @@ class DataBin(object):
 			NN = self.negSamp.shape[0]
 			self.negWt = np.ones(NN, dtype = 'float64') / NN / 2
 		else:
-			print('np.ndarray is required.')
-			raise TypeError
+			raise TypeError("argument 'negWt': np.ndarray is required.")
 
 		#Check the sum of weights
 		w = np.sum(self.posWt) + np.sum(self.negWt)
@@ -83,8 +78,7 @@ class DataBin(object):
 		if  isinstance(nBins, int):
 			self.nBins = nBins
 		else:
-			print('nBins:', 'type int is required.')
-			raise TypeError
+			raise TypeError("argument 'nBins': type int is required.")
 
 		self.posSampInterface = None 
 		self.negSampInterface = None
@@ -231,8 +225,7 @@ class BinaryTree(object):
 			self.tree = None
 			self.err = None
 		except AttributeError as e:
-			print('No Such parameter:', key)
-			raise e
+			raise e('No Such parameter:' + key)
 		finally:
 			assert self.pTree.fracFtrs <= 1
 
@@ -245,8 +238,7 @@ class BinaryTree(object):
 			path = os.path.dirname( os.path.abspath(__file__) )
 
 		if not isinstance(path, str):
-			print("Parameter 'path' is required to be str.")
-			raise TypeError
+			raise TypeError("Parameter 'path' is required to be str.")
 
 		f = npcl.load_library('bestStump', path)
 		pp = npcl.ndpointer(dtype = 'uintp', ndim = 1, flags = 'C')		#2D pointer(pointer to pointer)
@@ -276,18 +268,6 @@ class BinaryTree(object):
 	#Given data, find the best stump classifier.
 	#Wrap the function in C. Not recommanded to use alone.
 	def bestStump(self, data, nodePosWt, nodeNegWt, stumpFtrsId = None, prior = None):
-		if not isinstance(data, DataBin):
-			print('DataBin object type is required.')
-			raise TypeError
-
-		if not isinstance(nodePosWt, np.ndarray):
-			print('numpy.ndarray object type is required.')
-			raise TypeError
-
-		if not isinstance(nodeNegWt, np.ndarray):
-			print('numpy.ndarray object type is required.')
-			raise TypeError
-
 		if not prior:
 			posWtSum = np.sum(posWt)
 			negWtSum = np.sum(negWt)
@@ -347,8 +327,7 @@ class BinaryTree(object):
 			err        - decision tree training error
 		'''
 		if not isinstance(data, DataBin):
-			print('DataBin object type is required.')
-			raise TypeError
+			raise TypeError('DataBin object type is required.')
 
 		if not data.quant:
 			data.quantize()
@@ -457,8 +436,7 @@ class BinaryTree(object):
 			path = os.path.dirname( os.path.abspath(__file__) )
 
 		if not isinstance(path, str):
-			print("Parameter 'path' is required to be str.")
-			raise TypeError
+			raise TypeError("Parameter 'path' is required to be str.")
 
 		f = npcl.load_library('BinaryTreeApply', path)
 		pp = npcl.ndpointer(dtype = 'uintp', ndim = 1, flags = 'C')		#2D pointer(pointer to pointer)
@@ -484,19 +462,16 @@ class BinaryTree(object):
 	#
 	def apply(self, data):
 		if self.tree is None:
-			print('Binary tree has not been trained.')
-			raise Exception
+			raise Exception('Binary tree has not been trained.')
 
 		if not isinstance(data, np.ndarray):
-			print('numpy.ndarray type is required.')
-			raise TypeError
+			raise TypeError('numpy.ndarray type is required.')
 
 		if data.ndim == 1:
 			data = data.copy()
 			data = data.reshape(-1, 1)
 		elif data.ndim > 2:
-			print('1 or 2 dimension data is required.')
-			raise ValueError
+			raise ValueError('1 or 2 dimension data is required.')
 
 		rowId = np.arange(data.shape[0])
 		dataInterface = (data.ctypes.data + rowId * data.strides[0]).astype('uintp')
