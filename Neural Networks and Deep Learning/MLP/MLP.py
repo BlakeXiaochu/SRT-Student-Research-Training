@@ -42,9 +42,9 @@ class MLP(object):
 			samples, labels = trainData
 			samples, labels = samples[randOrder], labels[randOrder]
 
-			#epoch
+			#batch trainning
 			for j in range(0, sampleNum - batchSize, step = batchSize):
-				batch = (samples[j:j+batchSize, :], labels[j:j+batchSize, :])
+				batch = (samples[j:j+batchSize, :].T, labels[j:j+batchSize, :].T)
 				self.update(batch, alpha)
 
 			#print trainnig progress
@@ -54,9 +54,10 @@ class MLP(object):
 				print('Epoch %d complete...' % (i))
 
 
+
 	def feedforward(self, x):
 		for layer in self.layers:
-			x = layer.feedforward(x)
+			_, x = layer.feedforward(x)
 		return x
 
 
@@ -64,7 +65,31 @@ class MLP(object):
 	#apply gradient descent, and update the network weights when trainning with a batch
 	#alpha is the learning rate
 	def update(self, batch, alpha):
-		pass
+		samples, labels = batch
+
+		#feedforward
+		a = samples
+		z_list = [None]
+		a_list = [a]
+		for layer in self.layers:
+			z, a = layer.feedforward(a)
+			z_list.append(z)
+			a_list.append(a)
+
+
+		#last layer's error
+		aL, zL = a_list[-1], z_list[-1]
+		delta = (aL - labels) * (self.layers[-1].sigmoidPrime(zL))
+
+		#backprpagation
+		for i in range(1, self.layerNum):
+			a, z = a_list[-i - 1], z_list[-i - 1]
+			layer = self.layers[-i]
+			delta, Cb, Cw = layer.backprop(delta, z, a)
+			layer.update(Cw, Cb, alpha)
+
+		return			
+		
 
 
 	#the network will be evaluated against the test data after each epoch
@@ -75,6 +100,10 @@ class MLP(object):
 		results = np.argmax(x, axis = 0)
 
 		return np.sum( (results - np.argmax(labels, axis = 1)) == 0 )
+
+	#save trained model
+	def saveModel(self):
+		pass
 
 
 
@@ -125,14 +154,33 @@ class neurLayer(object):
 		return np.where(z < 0, 0, 1)
 
 	#activate neurons
-	def feedforward(self, x):
+	def activateFunc(self, x):
 		innerProd = np.dot(self.weights, x) + self.biases
 		output = self.activateFunc(innerProd)
 
-		return output
+		return innerProd, output
 
 
-	#backpropagation 
-	def backprop(self):
-		pass
+	#backpropagation, this layer's error known, return the prime layer's error
+	def backprop(self, deltaIn, z, a):
+		if z is None:
+			deltaOut = None
+		else:
+			deltaOut = np.dot(self.weights.T, deltaIn) * self.backpropFunc(z)
+		Cb = np.mean(deltaIn, axis = 1)
+
+		aT = a.T
+		deltaSize, aTSize = deltaIn.shape, aT.shape
+		deltaIn.shape = (deltaSize[0], 1, -1)
+		aT.shape = (1, aTSize[1], -1)
+		Cw = np.mean(deltaIn * a, axis = 2)
+		deltaIn.shape = deltaSize
+		del aT
+
+		return deltaOut, Cb, Cw
+	
+	#update weights and biases
+	def update(self, Cw, Cb, alpha):
+		self.weights -= alpha * Cw
+		self.biases -= alpha * Cb
 
