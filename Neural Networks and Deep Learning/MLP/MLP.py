@@ -33,32 +33,46 @@ class MLP(object):
 			alpha: learning rate
 			testData: a tuple/list of (samples, labels) for testing. if provided, MLP will eavluate the testing data in each epoch and print results
 		'''
-		sampleNum = trainData[0].shape[0]
-		testNum = testData[0].shape[0]
+		sampleNum = trainData[0].shape[1]
+		testNum = testData[0].shape[1]
 
+		#epoch
+		randOrder = np.arange(0, sampleNum)
 		for i in range(epochNum):
 			#shuffle the trainning data
-			randOrder = np.random.shuffle(np.arange(0, sampleNum))
+			np.random.shuffle(randOrder)
 			samples, labels = trainData
-			samples, labels = samples[randOrder], labels[randOrder]
+			samples, labels = samples[:, randOrder], labels[:, randOrder]
 
 			#batch trainning
-			for j in range(0, sampleNum - batchSize, step = batchSize):
-				batch = (samples[j:j+batchSize, :].T, labels[j:j+batchSize, :].T)
+			for j in range(0, sampleNum - batchSize, batchSize):
+				batch = (samples[:, j:j+batchSize], labels[:, j:j+batchSize])
 				self.update(batch, alpha)
+				del(batch)
+
+			del(samples)
+			del(labels)
 
 			#print trainnig progress
 			if testData:
-				print( 'Epoch %d: error = %.5f' % (i, self.evaluate(testData) / testNum) )
+				print( 'Epoch %d: testing accuracy = %.5f' % (i,  self.evaluate(testData) / testNum) )
 			else:
 				print('Epoch %d complete...' % (i))
 
 
 
-	def feedforward(self, x):
+	#feedforward
+	def feedforward(self, a):
 		for layer in self.layers:
-			_, x = layer.feedforward(x)
-		return x
+			_, a = layer.activate(a)
+		return a
+
+
+	#compute mean square error
+	def errCompute(self, a, labels):
+		error = np.sum((a - labels)**2 / 2.0, axis = 0)
+		error = np.mean(error)
+		return error
 
 
 
@@ -72,10 +86,9 @@ class MLP(object):
 		z_list = [None]
 		a_list = [a]
 		for layer in self.layers:
-			z, a = layer.feedforward(a)
+			z, a = layer.activate(a)
 			z_list.append(z)
 			a_list.append(a)
-
 
 		#last layer's error
 		aL, zL = a_list[-1], z_list[-1]
@@ -96,10 +109,10 @@ class MLP(object):
 	#return the number of correct classification samples 
 	def evaluate(self, testData):
 		samples, labels = testData
-		x = self.feedforward(samples.T)
-		results = np.argmax(x, axis = 0)
+		a = self.feedforward(samples)
+		results = np.argmax(a, axis = 0)
 
-		return np.sum( (results - np.argmax(labels, axis = 1)) == 0 )
+		return np.sum( (results - np.argmax(labels, axis = 0)) == 0 )
 
 	#save trained model
 	def saveModel(self):
@@ -131,20 +144,18 @@ class neurLayer(object):
 		return np.ones_like(z)
 
 	def sigmoid(self, z):
-		return 1/(1 + np.exp(-z))
+		return 0.5 * (1 + np.tanh(0.5 * z))
 
 	def sigmoidPrime(self, z):
 		a = self.sigmoid(z)
-		return a * (1 - a)
+		return a * (1.0 - a)
 
 	def tanh(self, z):
-		a = np.exp(-z)
-		b = np.exp(z)
-		return (b - a) / (b + a)
+		return np.tanh(z)
 
 	def tanhPrime(self, z):
-		a = self.tanh(z)
-		return 1 - a**2
+		a = np.tanh(z)
+		return 1.0 - a**2
 
 	def relu(self, z):
 		z[z < 0] = 0
@@ -154,7 +165,7 @@ class neurLayer(object):
 		return np.where(z < 0, 0, 1)
 
 	#activate neurons
-	def activateFunc(self, x):
+	def activate(self, x):
 		innerProd = np.dot(self.weights, x) + self.biases
 		output = self.activateFunc(innerProd)
 
@@ -162,20 +173,23 @@ class neurLayer(object):
 
 
 	#backpropagation, this layer's error known, return the prime layer's error
+	# def backprop(self, deltaIn, z, a):
+
 	def backprop(self, deltaIn, z, a):
 		if z is None:
 			deltaOut = None
 		else:
 			deltaOut = np.dot(self.weights.T, deltaIn) * self.backpropFunc(z)
 		Cb = np.mean(deltaIn, axis = 1)
+		Cb.shape = (Cb.shape[0], 1)
 
-		aT = a.T
-		deltaSize, aTSize = deltaIn.shape, aT.shape
-		deltaIn.shape = (deltaSize[0], 1, -1)
-		aT.shape = (1, aTSize[1], -1)
-		Cw = np.mean(deltaIn * a, axis = 2)
+		deltaSize = deltaIn.shape
+		deltaIn.shape = list(deltaSize) + [1]
+		deltaIn = np.swapaxes(deltaIn, 1, 2)
+
+		aT = a.reshape((1, a.shape[0], -1))
+		Cw = np.mean(deltaIn * aT, axis = 2)
 		deltaIn.shape = deltaSize
-		del aT
 
 		return deltaOut, Cb, Cw
 	
