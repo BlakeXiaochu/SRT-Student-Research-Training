@@ -18,5 +18,5 @@ alpha = 0.05
 batchSize = 10
 epochNum = 60
 
-model = MLP([trainSamples.shape[0], 100, 10], activateFunc = actFunc.sigmoid, regular = True, rLambda = 5.0)
+model = MLP([trainSamples.shape[0], 100, 10], activateFunc = actFunction.sigmoid, regular = True, rLambda = 5.0)
 model.SGD(trainData, epochNum, batchSize, alpha, testData)

@@ -1,6 +1,6 @@
 import numpy as np
 
-class actFunc(object):
+class actFunction(object):
 	'''
 		this class contains a set of activation functions, including linear, sigmoid, tanh, relu, and their derivation respectively
 	'''
@@ -47,3 +47,36 @@ class actFunc(object):
 	@staticmethod
 	def reluPrime(z):
 		return np.where(z < 0, 0, 1)
+
+
+class lossFunction(object):
+	'''
+		this class contains a set of loss functions, including mean square, cross entropy
+	'''
+	@classmethod
+	def getGradient(clsObj, func):
+		grads = clsObj.meanSquareGrads if func is clsObj.meanSquare else\
+				clsObj.crossEntropyGrads if func is clsObj.crossEntropy else None
+		return grads
+
+	@staticmethod
+	def meanSquare(a, labels):
+		error = np.sum((a - labels)**2 / 2.0, axis = 0)
+		error = np.mean(error)
+		return error
+
+	@staticmethod
+	def meanSquareGrads(a, labels):
+	#gradient of mean square loss function about results 'a'
+		return (a - labels)
+
+	@staticmethod
+	def crossEntropy(a, labels):
+		error = np.sum(labels * np.log(a) + (1 - labels) * np.log(1 - a), axis = 0)
+		error = -np.mean(error)
+		return error
+
+	@staticmethod
+	def crossEntropyGrads(a, labels):
+	#gradient of cross entropy loss function about results 'a'
+		return (a - labels) / (a * (1 - a))

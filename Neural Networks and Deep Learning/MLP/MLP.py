@@ -1,5 +1,6 @@
+import Queue
 import numpy as np
-from actFunc import *
+from funcKit import *
 from layer import *
 
 class MLP(object):
@@ -7,17 +8,16 @@ class MLP(object):
 		mutiple layers perceptron class
 		layers including x layer and output layer, so neuronNums should be greater than 2.
 	"""
-	__slots__ = {'neuronNums', 'activateType', 'layerNum', 'layers', 'biases', 'weights', 'lossType', 'regular', 'rLambda'}
-	def __init__(self, neuronNums, biases = None, weights = None, activateFunc = actFunc.sigmoid, regular = False, **kw):
+	__slots__ = {'neuronNums', 'activateType', 'layerNum', 'layers', 'biases', 'weights', 'lossFunc', 'regular', 'rLambda'}
+	def __init__(self, neuronNums, biases = None, weights = None, activateFunc = actFunction.sigmoid, lossFunc = lossFunction.crossEntropy, regular = False, **kw):
 		self.neuronNums = tuple(neuronNums)
 		self.layerNum = len(neuronNums)
 
 		#construct mutiple layers perceptron(input layer is absent)
-		self.lossType =  'meanSquare' if activateFunc is actFunc.linear else\
-						'crossEntropy' if activateFunc is actFunc.sigmoid else 'meanSquare'
-		self.layers = tuple([neurLayer(num) for num in neuronNums[1:]])
+		self.lossFunc =  lossFunc
+		self.layers = tuple( [neurLayer(num) for num in neuronNums[1:-1]] + [outputLayer(neuronNums[-1])] )
 
-		#regularization
+		#(L2)regularization
 		self.regular = regular
 		self.rLambda = kw['rLambda'] if regular else None
 
@@ -27,14 +27,16 @@ class MLP(object):
 			self.biases = biases
 
 		if weights is None:
-			self.weights = tuple([np.random.randn(j, i)/np.sqrt(neuronNums[0]) for i, j in zip(self.neuronNums[:-1], self.neuronNums[1:])])
+			self.weights = tuple([np.random.randn(j, i)/np.sqrt(i) for i, j in zip(self.neuronNums[:-1], self.neuronNums[1:])])
 		else: 
 			self.weights = weights
 
-		#initialize biases and weights
-		for i in range(self.layerNum - 1):
-			self.layers[i].initParam(self.biases[i], self.weights[i])
-			self.layers[i].initActFunc(activateFunc)
+		#initialize biases, weights and activation function(hidden layers)
+		for i in range(self.layerNum - 2):
+			self.layers[i].initParam(self.biases[i], self.weights[i], activateFunc)
+
+		#output layer
+		self.layers[-1].initParam(self.biases[-1], self.weights[-1], activateFunc, lossFunc)
 
 
 
@@ -83,15 +85,8 @@ class MLP(object):
 
 
 	#compute mean square error
-	def errCompute(self, a, labels):
-		if self.lossType == 'meanSquare':
-			error = np.sum((a - labels)**2 / 2.0, axis = 0)
-			error = np.mean(error)
-			return error
-		elif self.lossType == 'crossEntropy':
-			error = np.sum(labels * np.log(a) + (1 - labels) * np.log(1 - a), axis = 0)
-			error = -np.mean(error)
-			return error
+	def lossCompute(self, a, labels):
+		return self.layers[-1].lossCompute(a, labels)
 
 
 
@@ -110,21 +105,20 @@ class MLP(object):
 			z_list.append(z)
 			a_list.append(a)
 
-		#last layer's error
+		#output layer's delta
 		aL, zL = a_list[-1], z_list[-1]
-		if self.lossType == 'meanSquare':
-			delta = (aL - labels) * (self.layers[-1].sigmoidPrime(zL))
-		elif self.lossType == 'crossEntropy':
-			delta = (aL - labels)
+		delta = self.layers[-1].deltaCompute(zL, aL, labels)
 
 		#backprpagation
 		for i in range(1, self.layerNum):
 			a, z = a_list[-i - 1], z_list[-i - 1]
 			layer = self.layers[-i]
 			delta, Cb, Cw = layer.backprop(delta, z, a)
+
 			#regularization
 			if self.regular:
 				Cw += (self.rLambda * layer.weights / totalSampleNum)
+
 			layer.update(Cw, Cb, alpha)
 
 		return			

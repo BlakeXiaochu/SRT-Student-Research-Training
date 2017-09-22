@@ -11,7 +11,7 @@ model = MLP([3, 5, 3])
 
 for i in range(10):
 	a = model.feedforward(samples)
-	error = model.errCompute(a, labels)
+	error = model.lossCompute(a, labels)
 	print(error)
 
 	model.update((samples, labels), 3.0)

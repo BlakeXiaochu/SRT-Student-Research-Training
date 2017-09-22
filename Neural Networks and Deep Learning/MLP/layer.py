@@ -1,8 +1,8 @@
-from actFunc import *
+from funcKit import *
 import numpy as np
 
 class neurLayer(object):
-	"""basic layer class"""
+	"""basic layer class(hidden layer)"""
 	__slots__ = {'neuronNum', 'biases', 'weights', 'activateFunc', 'backpropFunc'}
 	def __init__(self, neuronNum):
 		self.neuronNum = neuronNum
@@ -20,16 +20,12 @@ class neurLayer(object):
 		# 					self.tanhPrime if activateType == 'relu' else None
 
 
-	#initialize the biases and weights
-	def initParam(self, biases, weights):
+	#initialize the biases, weights and activation function
+	def initParam(self, biases, weights, activateFunc):
 		self.biases = biases
 		self.weights = weights
-
-
-	#initialize the activation function
-	def initActFunc(self, activateFunc):
 		self.activateFunc = activateFunc
-		self.backpropFunc = actFunc.getDerivation(activateFunc)
+		self.backpropFunc = actFunction.getDerivation(activateFunc)
 		
 		if self.backpropFunc is None:
 			raise ValueError('invalid activation type.')
@@ -73,15 +69,31 @@ class neurLayer(object):
 
 class outputLayer(neurLayer):
 	'''output layer class'''
+	__slots__ = {'neuronNum', 'biases', 'weights', 'activateFunc', 'backpropFunc', 'lossFunc', 'lossFuncGrads'}
 	def __init__(self, neuronNum):
 		super(outputLayer, self).__init__(neuronNum)
 
-	def initActFunc(self, actFunc):
+	#initialize the biases, weights and activation function
+	def initParam(self, biases, weights, activateFunc, lossFunc):
+		self.biases = biases
+		self.weights = weights
 		self.activateFunc = activateFunc
-		pass
-		self.backpropFunc = actFunc.getDerivation(activateFunc)
-
-	def deltaCompute(self):
-		pass
+		self.backpropFunc = actFunction.getDerivation(activateFunc)
+		self.lossFunc = lossFunc
+		self.lossFuncGrads = lossFunction.getGradient(lossFunc)
 		
+		if self.backpropFunc is None:
+			raise ValueError('invalid activation type.')
+		if self.lossFuncGrads is None:
+			raise ValueError('invalid loss function type.')
 
+
+	#compute loss
+	def lossCompute(self, a, labels):
+		return self.lossFunc(a, labels)
+
+	#compute output layer's delta
+	def deltaCompute(self, z, a, labels):
+		delta = self.backpropFunc(z) * self.lossFuncGrads(a, labels)
+		return delta
+		
