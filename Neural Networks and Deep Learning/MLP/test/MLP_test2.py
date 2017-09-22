@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../')
 import numpy as np
 from MLP import *
 
@@ -12,4 +14,4 @@ for i in range(10):
 	error = model.errCompute(a, labels)
 	print(error)
 
-	model.update((samples, labels), 1)
+	model.update((samples, labels), 3.0)

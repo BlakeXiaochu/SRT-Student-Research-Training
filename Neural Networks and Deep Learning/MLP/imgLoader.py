@@ -5,9 +5,9 @@ def loadImageSet(which = 0):
     print("load image set")
     binfile = None
     if which == 0:
-        binfile = open("MNIST DATABASE//train-images.idx3-ubyte", 'rb')
+        binfile = open("..//MNIST DATABASE//train-images.idx3-ubyte", 'rb')
     else:
-        binfile = open("MNIST DATABASE//t10k-images.idx3-ubyte", 'rb')
+        binfile = open("..//MNIST DATABASE//t10k-images.idx3-ubyte", 'rb')
     buffers = binfile.read()
 
     head = struct.unpack_from('>IIII' , buffers, 0)
@@ -34,9 +34,9 @@ def loadLabelSet(which = 0):
     print("load label set")
     binfile = None
     if which == 0:
-        binfile = open("MNIST DATABASE//train-labels.idx1-ubyte", 'rb')
+        binfile = open("..//MNIST DATABASE//train-labels.idx1-ubyte", 'rb')
     else:
-        binfile = open("MNIST DATABASE//t10k-labels.idx1-ubyte", 'rb')
+        binfile = open("..//MNIST DATABASE//t10k-labels.idx1-ubyte", 'rb')
     buffers = binfile.read()
 
     head = struct.unpack_from('>II' , buffers, 0)

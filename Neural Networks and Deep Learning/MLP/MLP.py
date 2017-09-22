@@ -1,14 +1,25 @@
 import numpy as np
+from actFunc import *
+from layer import *
 
 class MLP(object):
 	"""
 		mutiple layers perceptron class
 		layers including x layer and output layer, so neuronNums should be greater than 2.
 	"""
-	__slots__ = {'neuronNums', 'layerNum', 'layers', 'biases', 'weights'}
-	def __init__(self, neuronNums, biases = None, weights = None):
+	__slots__ = {'neuronNums', 'activateType', 'layerNum', 'layers', 'biases', 'weights', 'lossType', 'regular', 'rLambda'}
+	def __init__(self, neuronNums, biases = None, weights = None, activateFunc = actFunc.sigmoid, regular = False, **kw):
 		self.neuronNums = tuple(neuronNums)
 		self.layerNum = len(neuronNums)
+
+		#construct mutiple layers perceptron(input layer is absent)
+		self.lossType =  'meanSquare' if activateFunc is actFunc.linear else\
+						'crossEntropy' if activateFunc is actFunc.sigmoid else 'meanSquare'
+		self.layers = tuple([neurLayer(num) for num in neuronNums[1:]])
+
+		#regularization
+		self.regular = regular
+		self.rLambda = kw['rLambda'] if regular else None
 
 		if biases is None:
 			self.biases = tuple([np.random.randn(i, 1) for i in self.neuronNums[1:]])
@@ -16,12 +27,15 @@ class MLP(object):
 			self.biases = biases
 
 		if weights is None:
-			self.weights = tuple([np.random.randn(j, i) for i, j in zip(self.neuronNums[:-1], self.neuronNums[1:])])
+			self.weights = tuple([np.random.randn(j, i)/np.sqrt(neuronNums[0]) for i, j in zip(self.neuronNums[:-1], self.neuronNums[1:])])
 		else: 
 			self.weights = weights
 
-		#construct mutiple layers perceptron(x layer is absent)
-		self.layers = tuple([neurLayer(num, bias, weight, 'sigmoid') for num, bias, weight in zip(neuronNums[1:], self.biases, self.weights)])
+		#initialize biases and weights
+		for i in range(self.layerNum - 1):
+			self.layers[i].initParam(self.biases[i], self.weights[i])
+			self.layers[i].initActFunc(activateFunc)
+
 
 
 	#mini-batch stochastic gradient descent
@@ -47,15 +61,15 @@ class MLP(object):
 			#batch trainning
 			for j in range(0, sampleNum - batchSize, batchSize):
 				batch = (samples[:, j:j+batchSize], labels[:, j:j+batchSize])
-				self.update(batch, alpha)
-				del(batch)
+				self.update(batch, alpha, sampleNum)
+				del batch
 
-			del(samples)
-			del(labels)
+			del samples
+			del labels
 
 			#print trainnig progress
 			if testData:
-				print( 'Epoch %d: testing accuracy = %.5f' % (i,  self.evaluate(testData) / testNum) )
+				print( 'Epoch %d: testing accuracy = %.4f' % (i,  self.evaluate(testData) / testNum) )
 			else:
 				print('Epoch %d complete...' % (i))
 
@@ -70,15 +84,21 @@ class MLP(object):
 
 	#compute mean square error
 	def errCompute(self, a, labels):
-		error = np.sum((a - labels)**2 / 2.0, axis = 0)
-		error = np.mean(error)
-		return error
+		if self.lossType == 'meanSquare':
+			error = np.sum((a - labels)**2 / 2.0, axis = 0)
+			error = np.mean(error)
+			return error
+		elif self.lossType == 'crossEntropy':
+			error = np.sum(labels * np.log(a) + (1 - labels) * np.log(1 - a), axis = 0)
+			error = -np.mean(error)
+			return error
 
 
 
 	#apply gradient descent, and update the network weights when trainning with a batch
 	#alpha is the learning rate
-	def update(self, batch, alpha):
+	#totalSampleNum param is used for regularization
+	def update(self, batch, alpha, totalSampleNum = None):
 		samples, labels = batch
 
 		#feedforward
@@ -92,13 +112,19 @@ class MLP(object):
 
 		#last layer's error
 		aL, zL = a_list[-1], z_list[-1]
-		delta = (aL - labels) * (self.layers[-1].sigmoidPrime(zL))
+		if self.lossType == 'meanSquare':
+			delta = (aL - labels) * (self.layers[-1].sigmoidPrime(zL))
+		elif self.lossType == 'crossEntropy':
+			delta = (aL - labels)
 
 		#backprpagation
 		for i in range(1, self.layerNum):
 			a, z = a_list[-i - 1], z_list[-i - 1]
 			layer = self.layers[-i]
 			delta, Cb, Cw = layer.backprop(delta, z, a)
+			#regularization
+			if self.regular:
+				Cw += (self.rLambda * layer.weights / totalSampleNum)
 			layer.update(Cw, Cb, alpha)
 
 		return			
@@ -114,87 +140,7 @@ class MLP(object):
 
 		return np.sum( (results - np.argmax(labels, axis = 0)) == 0 )
 
+
 	#save trained model
 	def saveModel(self):
 		pass
-
-
-
-class neurLayer(object):
-	"""layer class"""
-	def __init__(self, neuronNum, biases, weights, activateType):
-		self.neuronNum = neuronNum
-		self.biases = biases
-		self.weights = weights
-		self.activateFunc = self.linear if activateType == 'linear' else\
-							self.sigmoid if activateType == 'sigmoid' else\
-							self.tanh if activateType == 'tanh' else None
-		self.backpropFunc = self.linearPrime if activateType == 'linear' else\
-							self.sigmoidPrime if activateType == 'sigmoid' else\
-							self.tanhPrime if activateType == 'tanh' else None
-
-		if self.activateFunc is None:
-			raise ValueError('invalid activation type.')
-
-	#activation function
-	def linear(self, z):
-		return z
-
-	def linearPrime(self, z):
-		return np.ones_like(z)
-
-	def sigmoid(self, z):
-		return 0.5 * (1 + np.tanh(0.5 * z))
-
-	def sigmoidPrime(self, z):
-		a = self.sigmoid(z)
-		return a * (1.0 - a)
-
-	def tanh(self, z):
-		return np.tanh(z)
-
-	def tanhPrime(self, z):
-		a = np.tanh(z)
-		return 1.0 - a**2
-
-	def relu(self, z):
-		z[z < 0] = 0
-		return z
-
-	def reluPrime(self, z):
-		return np.where(z < 0, 0, 1)
-
-	#activate neurons
-	def activate(self, x):
-		innerProd = np.dot(self.weights, x) + self.biases
-		output = self.activateFunc(innerProd)
-
-		return innerProd, output
-
-
-	#backpropagation, this layer's error known, return the prime layer's error
-	# def backprop(self, deltaIn, z, a):
-
-	def backprop(self, deltaIn, z, a):
-		if z is None:
-			deltaOut = None
-		else:
-			deltaOut = np.dot(self.weights.T, deltaIn) * self.backpropFunc(z)
-		Cb = np.mean(deltaIn, axis = 1)
-		Cb.shape = (Cb.shape[0], 1)
-
-		deltaSize = deltaIn.shape
-		deltaIn.shape = list(deltaSize) + [1]
-		deltaIn = np.swapaxes(deltaIn, 1, 2)
-
-		aT = a.reshape((1, a.shape[0], -1))
-		Cw = np.mean(deltaIn * aT, axis = 2)
-		deltaIn.shape = deltaSize
-
-		return deltaOut, Cb, Cw
-	
-	#update weights and biases
-	def update(self, Cw, Cb, alpha):
-		self.weights -= alpha * Cw
-		self.biases -= alpha * Cb
-
