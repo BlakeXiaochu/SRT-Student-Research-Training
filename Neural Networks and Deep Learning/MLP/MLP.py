@@ -1,4 +1,4 @@
-import Queue
+import queue
 import numpy as np
 from funcKit import *
 from layer import *
@@ -96,22 +96,24 @@ class MLP(object):
 	def update(self, batch, alpha, totalSampleNum = None):
 		samples, labels = batch
 
-		#feedforward
+		#feedforward, and save intermadiate results using LIFO queue
 		a = samples
-		z_list = [None]
-		a_list = [a]
+		zQ = queue.LifoQueue(maxsize = self.layerNum)
+		aQ = queue.LifoQueue(maxsize = self.layerNum)
+		zQ.put(None)
+		aQ.put(a)
 		for layer in self.layers:
 			z, a = layer.activate(a)
-			z_list.append(z)
-			a_list.append(a)
+			zQ.put(z)
+			aQ.put(a)
 
 		#output layer's delta
-		aL, zL = a_list[-1], z_list[-1]
+		zL, aL = zQ.get(), aQ.get()
 		delta = self.layers[-1].deltaCompute(zL, aL, labels)
 
 		#backprpagation
 		for i in range(1, self.layerNum):
-			a, z = a_list[-i - 1], z_list[-i - 1]
+			z, a = zQ.get(), aQ.get()
 			layer = self.layers[-i]
 			delta, Cb, Cw = layer.backprop(delta, z, a)
 
