@@ -14,9 +14,9 @@ testLables = loadLabelSet(1)
 testData = (testSamples, testLables)
 
 #trainning param
-alpha = 0.05
-batchSize = 10
-epochNum = 60
+alpha = 0.1
+batchSize = 20
+epochNum = 30
 
-model = MLP([trainSamples.shape[0], 100, 10], activateFunc = actFunction.sigmoid, regular = True, rLambda = 5.0)
-model.SGD(trainData, epochNum, batchSize, alpha, testData)
+model = MLP([trainSamples.shape[0], 100, 10], activateFunc = actFunction.sigmoid, lossFunc = lossFunction.crossEntropy, regular = True, momentum = True, rLambda = 5.0, miu = 0.3)
+model.SGD(trainData, epochNum, batchSize, alpha, testData, monitor = True)

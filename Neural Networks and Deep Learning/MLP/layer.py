@@ -43,10 +43,7 @@ class neurLayer(object):
 	# def backprop(self, deltaIn, z, a):
 
 	def backprop(self, deltaIn, z, a):
-		if z is None:
-			deltaOut = None
-		else:
-			deltaOut = np.dot(self.weights.T, deltaIn) * self.backpropFunc(z)
+		deltaOut = None if (z is None) else np.dot(self.weights.T, deltaIn) * self.backpropFunc(z)
 		Cb = np.mean(deltaIn, axis = 1)
 		Cb.shape = (Cb.shape[0], 1)
 
@@ -61,9 +58,9 @@ class neurLayer(object):
 		return deltaOut, Cb, Cw
 	
 	#update weights and biases
-	def update(self, Cw, Cb, alpha):
-		self.weights -= alpha * Cw
-		self.biases -= alpha * Cb
+	def update(self, delta_w, delta_b):
+		self.weights += delta_w
+		self.biases += delta_b
 
 
 

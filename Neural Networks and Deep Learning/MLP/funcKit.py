@@ -46,7 +46,7 @@ class actFunction(object):
 
 	@staticmethod
 	def reluPrime(z):
-		return np.where(z < 0, 0, 1)
+		return np.where(z <= 0, 0, 1)
 
 
 class lossFunction(object):
@@ -72,11 +72,12 @@ class lossFunction(object):
 
 	@staticmethod
 	def crossEntropy(a, labels):
-		error = np.sum(labels * np.log(a) + (1 - labels) * np.log(1 - a), axis = 0)
+		error = np.sum((labels + 1e-8) * np.log(a + 1e-8) + (1 - labels + 1e-8) * np.log(1 - a + 1e-8), axis = 0)
+		error = np.nan_to_num(error)
 		error = -np.mean(error)
 		return error
 
 	@staticmethod
 	def crossEntropyGrads(a, labels):
 	#gradient of cross entropy loss function about results 'a'
-		return (a - labels) / (a * (1 - a))
+		return (a - labels) / (a * (1 - a) + 1e-8)

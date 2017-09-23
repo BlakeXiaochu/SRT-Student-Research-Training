@@ -1,5 +1,7 @@
 import queue
+from sys import exit as quit
 import numpy as np
+import matplotlib.pyplot as plt
 from funcKit import *
 from layer import *
 
@@ -8,8 +10,8 @@ class MLP(object):
 		mutiple layers perceptron class
 		layers including x layer and output layer, so neuronNums should be greater than 2.
 	"""
-	__slots__ = {'neuronNums', 'activateType', 'layerNum', 'layers', 'biases', 'weights', 'lossFunc', 'regular', 'rLambda'}
-	def __init__(self, neuronNums, biases = None, weights = None, activateFunc = actFunction.sigmoid, lossFunc = lossFunction.crossEntropy, regular = False, **kw):
+	__slots__ = {'neuronNums', 'activateType', 'layerNum', 'layers', 'biases', 'weights', 'lossFunc', 'regular', 'rLambda', 'momentum', 'miu', 'velocity'}
+	def __init__(self, neuronNums, biases = None, weights = None, activateFunc = actFunction.sigmoid, lossFunc = lossFunction.crossEntropy, regular = False, momentum = False, **kw):
 		self.neuronNums = tuple(neuronNums)
 		self.layerNum = len(neuronNums)
 
@@ -20,6 +22,11 @@ class MLP(object):
 		#(L2)regularization
 		self.regular = regular
 		self.rLambda = kw['rLambda'] if regular else None
+
+		#momentum
+		self.momentum = momentum
+		self.miu = kw['miu'] if momentum else 0
+		self.velocity = [0] * (self.layerNum - 1)
 
 		if biases is None:
 			self.biases = tuple([np.random.randn(i, 1) for i in self.neuronNums[1:]])
@@ -41,16 +48,21 @@ class MLP(object):
 
 
 	#mini-batch stochastic gradient descent
-	def SGD(self, trainData, epochNum, batchSize, alpha, testData = None):
+	def SGD(self, trainData, epochNum, batchSize, alpha, testData = None, monitor = False):
 		'''
 			trainData: a tuple/list of (samples, labels), in which samples and labels' type are 2-D numpy.ndarray
 			epochNum: the number of trainning epochs
 			batchSize: the number of trainning samples in each epoch
 			alpha: learning rate
 			testData: a tuple/list of (samples, labels) for testing. if provided, MLP will eavluate the testing data in each epoch and print results
+			monitor: wheather monitoring the first trainning epoch or not, used for tuning.
 		'''
 		sampleNum = trainData[0].shape[1]
 		testNum = testData[0].shape[1]
+
+		#monitor the first trainning process
+		if monitor:
+			self.monitor(trainData, batchSize, alpha)
 
 		#epoch
 		randOrder = np.arange(0, sampleNum)
@@ -109,22 +121,52 @@ class MLP(object):
 
 		#output layer's delta
 		zL, aL = zQ.get(), aQ.get()
+		loss = self.layers[-1].lossCompute(aL, labels)
 		delta = self.layers[-1].deltaCompute(zL, aL, labels)
 
 		#backprpagation
 		for i in range(1, self.layerNum):
-			z, a = zQ.get(), aQ.get()
 			layer = self.layers[-i]
+			z, a = zQ.get(), aQ.get()
 			delta, Cb, Cw = layer.backprop(delta, z, a)
 
 			#regularization
 			if self.regular:
 				Cw += (self.rLambda * layer.weights / totalSampleNum)
 
-			layer.update(Cw, Cb, alpha)
+			self.velocity[-i] *= self.miu
+			self.velocity[-i] -= alpha * Cw
 
-		return			
+			layer.update(self.velocity[-i], -alpha*Cb)
+
+		return loss
 		
+
+	#monitoring training process in one epoch
+	def monitor(self, trainData, batchSize, alpha):
+		samples, labels = trainData
+		sampleNum = samples.shape[1]
+		results = []
+		for j in range(0, sampleNum - batchSize, batchSize):
+			batch = (samples[:, j:j+batchSize], labels[:, j:j+batchSize])
+			loss = self.update(batch, alpha, sampleNum)
+			results.append(loss)
+			del batch
+
+		#plot the results
+		plt.plot(np.array(results))
+		plt.xlabel('batch(s)')
+		plt.ylabel('loss')
+		plt.title('The First Epoch')
+		plt.show()
+
+		#continue or not
+		while True: 
+			cmd = input('continue?(yes/no): ')
+			if cmd == 'yes':
+				break
+			elif cmd == 'no':
+				quit('trainning end...')
 
 
 	#the network will be evaluated against the test data after each epoch
