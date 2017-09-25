@@ -21,7 +21,7 @@ class neurLayer(object):
 
 
 	#initialize the biases, weights and activation function
-	def initParam(self, biases, weights, activateFunc):
+	def initParams(self, biases, weights, activateFunc):
 		self.biases = biases
 		self.weights = weights
 		self.activateFunc = activateFunc
@@ -71,7 +71,7 @@ class outputLayer(neurLayer):
 		super(outputLayer, self).__init__(neuronNum)
 
 	#initialize the biases, weights and activation function
-	def initParam(self, biases, weights, activateFunc, lossFunc):
+	def initParams(self, biases, weights, activateFunc, lossFunc):
 		self.biases = biases
 		self.weights = weights
 		self.activateFunc = activateFunc

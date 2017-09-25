@@ -1,4 +1,5 @@
 import queue
+import h5py
 from sys import exit as quit
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,8 +11,15 @@ class MLP(object):
 		mutiple layers perceptron class
 		layers including x layer and output layer, so neuronNums should be greater than 2.
 	"""
-	__slots__ = {'neuronNums', 'activateType', 'layerNum', 'layers', 'biases', 'weights', 'lossFunc', 'regular', 'rLambda', 'momentum', 'miu', 'velocity'}
-	def __init__(self, neuronNums, biases = None, weights = None, activateFunc = actFunction.sigmoid, lossFunc = lossFunction.crossEntropy, regular = False, momentum = False, **kw):
+	__slots__ = {'neuronNums', 'layerNum', 'layers', 'biases', 'weights', 'lossFunc', 'regular', 'rLambda', 'momentum', 'miu', 'velocity'}
+	def __init__(self):
+		attrs = {'neuronNums', 'layerNum', 'layers', 'biases', 'weights', 'lossFunc', 'regular', 'rLambda', 'momentum', 'miu', 'velocity'}
+		for attr in attrs:
+			setattr(self, attr, None)
+
+
+	#initialize parameters
+	def initParams(self, neuronNums, biases = None, weights = None, activateFunc = actFunction.sigmoid, lossFunc = lossFunction.crossEntropy, regular = False, momentum = False, **kw):
 		self.neuronNums = tuple(neuronNums)
 		self.layerNum = len(neuronNums)
 
@@ -40,10 +48,10 @@ class MLP(object):
 
 		#initialize biases, weights and activation function(hidden layers)
 		for i in range(self.layerNum - 2):
-			self.layers[i].initParam(self.biases[i], self.weights[i], activateFunc)
+			self.layers[i].initParams(self.biases[i], self.weights[i], activateFunc)
 
 		#output layer
-		self.layers[-1].initParam(self.biases[-1], self.weights[-1], activateFunc, lossFunc)
+		self.layers[-1].initParams(self.biases[-1], self.weights[-1], activateFunc, lossFunc)
 
 
 
@@ -180,5 +188,24 @@ class MLP(object):
 
 
 	#save trained model
-	def saveModel(self):
-		pass
+	#save as hdf5 file
+	def saveModel(self, path = './model.hdf5'):
+		try:
+			f = h5py.File(path, 'w')
+			f.create_dataset('biases', data = self.biases)
+			f.create_dataset('weights', data = self.weights)
+		except Exception as e:
+			f.close()
+			raise e
+
+
+
+	#load trained model(save as hdf5 file)
+	def loadModel(self, path = './model.hdf5'):
+		try:
+			f = h5py.File(path, 'r')
+			self.biases = f['biases'][:]
+			self.weights = f['weights'][:]
+		except Exception as e:
+			f.close()
+			raise e
