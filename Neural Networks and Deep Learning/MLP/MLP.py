@@ -1,6 +1,7 @@
 import queue
 import h5py
 from sys import exit as quit
+from os import remove
 import numpy as np
 import matplotlib.pyplot as plt
 from funcKit import *
@@ -11,9 +12,9 @@ class MLP(object):
 		mutiple layers perceptron class
 		layers including x layer and output layer, so neuronNums should be greater than 2.
 	"""
-	__slots__ = {'neuronNums', 'layerNum', 'layers', 'biases', 'weights', 'lossFunc', 'regular', 'rLambda', 'momentum', 'miu', 'velocity'}
+	__slots__ = {'neuronNums', 'layerNum', 'layers', 'biases', 'weights', 'activateFunc', 'lossFunc', 'regular', 'rLambda', 'momentum', 'miu', 'velocity'}
 	def __init__(self):
-		attrs = {'neuronNums', 'layerNum', 'layers', 'biases', 'weights', 'lossFunc', 'regular', 'rLambda', 'momentum', 'miu', 'velocity'}
+		attrs = {'neuronNums', 'layerNum', 'layers', 'biases', 'weights', 'activateFunc', 'lossFunc', 'regular', 'rLambda', 'momentum', 'miu', 'velocity'}
 		for attr in attrs:
 			setattr(self, attr, None)
 
@@ -24,6 +25,7 @@ class MLP(object):
 		self.layerNum = len(neuronNums)
 
 		#construct mutiple layers perceptron(input layer is absent)
+		self.activateFunc = activateFunc
 		self.lossFunc =  lossFunc
 		self.layers = tuple( [neurLayer(num) for num in neuronNums[1:-1]] + [outputLayer(neuronNums[-1])] )
 
@@ -192,20 +194,53 @@ class MLP(object):
 	def saveModel(self, path = './model.hdf5'):
 		try:
 			f = h5py.File(path, 'w')
-			f.create_dataset('biases', data = self.biases)
-			f.create_dataset('weights', data = self.weights)
+
+			#basicParams dataset stores layerNum, the types of activation and loss function
+			basicParams = f.create_dataset('basicParams', (3, ), dtype = 'i8')
+			actType = actFunction.funcTypeEncode(self.activateFunc)
+			lossType = lossFunction.funcTypeEncode(self.lossFunc)
+			basicParams[0] = self.layerNum
+			basicParams[1] = actType
+			basicParams[2] = lossType
+
+			#biases and weights groups
+			biasesGrp = f.create_group('biases')
+			weightsGrp = f.create_group('weights')
+			for i, layer in zip(range(1, self.layerNum), self.layers):
+				biasesGrp.create_dataset('b' + str(i), data = layer.biases)
+				weightsGrp.create_dataset('w' + str(i), data = layer.weights)
+
 		except Exception as e:
 			f.close()
+			remove(path)
 			raise e
-
+		else:
+			f.close()
 
 
 	#load trained model(save as hdf5 file)
 	def loadModel(self, path = './model.hdf5'):
 		try:
 			f = h5py.File(path, 'r')
+
+			basicParams = f['basicParams']
+			self.layerNum = basicParams[0]
+			self.activateFunc = actFunction.funcTypeDecode(basicParams[1])
+			self.lossFunc = lossFunction.funcTypeDecode(basicParams[2])
+
+			#biases and weights groups
+			biasesGrp = f['/biases']
+			weightsGrp = f['/weights']
+			#uncomplete
+			pass
 			self.biases = f['biases'][:]
 			self.weights = f['weights'][:]
 		except Exception as e:
 			f.close()
 			raise e
+		finally:
+			#initialize biases, weights and activation function(hidden layers)
+			for i in range(self.layerNum - 2):
+				self.layers[i].initParams(self.biases[i], self.weights[i], activateFunc)
+			#output layer
+			self.layers[-1].initParams(self.biases[-1], self.weights[-1], activateFunc, lossFunc)

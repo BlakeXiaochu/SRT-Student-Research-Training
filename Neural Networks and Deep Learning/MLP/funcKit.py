@@ -12,6 +12,22 @@ class actFunction(object):
 					clsObj.reluPrime if func is clsObj.relu else None
 		return funcPrime
 
+	@classmethod
+	def funcTypeEncode(clsObj, func):
+		funcType =  0 if func is clsObj.linear else\
+					1 if func is clsObj.sigmoid else\
+					2 if func is clsObj.tanh else\
+					3 if func is clsObj.relu else None
+		return funcType
+
+	@classmethod
+	def funcTypeDecode(clsObj, funcType):
+		func = 	clsObj.linear if funcType is 0 else\
+				clsObj.sigmoid if funcType is 1 else\
+				clsObj.tanh if funcType is 2 else\
+				clsObj.relu if funcType is 3 else None
+		return func
+
 	@staticmethod
 	def linear(z):
 		return z
@@ -58,6 +74,18 @@ class lossFunction(object):
 		grads = clsObj.meanSquareGrads if func is clsObj.meanSquare else\
 				clsObj.crossEntropyGrads if func is clsObj.crossEntropy else None
 		return grads
+
+	@classmethod
+	def funcTypeEncode(clsObj, func):
+		funcType = 0 if func is clsObj.meanSquare else\
+				   1 if func is clsObj.crossEntropy else None
+		return funcType
+
+	@classmethod
+	def funcTypeDecode(clsObj, funcType):
+		func = 	clsObj.meanSquareGrads if funcType is 0 else\
+				clsObj.crossEntropyGrads if funcType is 1 else None
+		return func
 
 	@staticmethod
 	def meanSquare(a, labels):
