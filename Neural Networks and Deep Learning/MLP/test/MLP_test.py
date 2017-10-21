@@ -19,5 +19,5 @@ batchSize = 20
 epochNum = 30
 
 model = MLP()
-model.initParams([trainSamples.shape[0], 100, 10], activateFunc = actFunction.sigmoid, lossFunc = lossFunction.crossEntropy, regular = True, momentum = True, rLambda = 5.0, miu = 0.3)
+model.initParams([trainSamples.shape[0], 100, 10], activateFunc = actFunction.sigmoid, lossFunc = lossFunction.crossEntropy, regular = True, momentum = True, rLambda = 5.0, miu = 0.8)
 model.SGD(trainData, epochNum, batchSize, alpha, testData, monitor = True)

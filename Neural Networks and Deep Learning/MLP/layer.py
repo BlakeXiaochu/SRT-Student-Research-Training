@@ -47,6 +47,7 @@ class neurLayer(object):
 		Cb = np.mean(deltaIn, axis = 1)
 		Cb.shape = (Cb.shape[0], 1)
 
+		#reshape for broadcasting
 		deltaSize = deltaIn.shape
 		deltaIn.shape = list(deltaSize) + [1]
 		deltaIn = np.swapaxes(deltaIn, 1, 2)
@@ -93,4 +94,8 @@ class outputLayer(neurLayer):
 	def deltaCompute(self, z, a, labels):
 		delta = self.backpropFunc(z) * self.lossFuncGrads(a, labels)
 		return delta
-		
+
+
+
+# class softmax()：
+# 	'''softmax layer '''		

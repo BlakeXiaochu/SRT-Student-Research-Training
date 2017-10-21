@@ -9,7 +9,8 @@ class actFunction(object):
 		funcPrime = clsObj.linearPrime if func is clsObj.linear else\
 					clsObj.sigmoidPrime if func is clsObj.sigmoid else\
 					clsObj.tanhPrime if func is clsObj.tanh else\
-					clsObj.reluPrime if func is clsObj.relu else None
+					clsObj.reluPrime if func is clsObj.relu else\
+					clsObj.softmaxPrime if func is clsObj.softmax None
 		return funcPrime
 
 	@classmethod
@@ -17,7 +18,8 @@ class actFunction(object):
 		funcType =  0 if func is clsObj.linear else\
 					1 if func is clsObj.sigmoid else\
 					2 if func is clsObj.tanh else\
-					3 if func is clsObj.relu else None
+					3 if func is clsObj.relu else\
+					4 if func is clsObj.softmax else None
 		return funcType
 
 	@classmethod
@@ -25,7 +27,8 @@ class actFunction(object):
 		func = 	clsObj.linear if funcType is 0 else\
 				clsObj.sigmoid if funcType is 1 else\
 				clsObj.tanh if funcType is 2 else\
-				clsObj.relu if funcType is 3 else None
+				clsObj.relu if funcType is 3 else\
+				clsObj.softmax if funcType is 4 else None
 		return func
 
 	@staticmethod
@@ -63,6 +66,19 @@ class actFunction(object):
 	@staticmethod
 	def reluPrime(z):
 		return np.where(z <= 0, 0, 1)
+
+	@staticmethod
+	def softmax(z):
+		zMax = np.max(a, axis = 0)
+		zMax.shape = (-1, zMax.shape[0])
+		#unnormalized probability
+		p = np.exp(z - zMax)
+		return p / (np.reshape(np.sum(p, axis = 0)), zMax.shape)
+
+	#unfinished
+	@staticmethod
+	def softmaxPrime(z):
+		pass
 
 
 class lossFunction(object):

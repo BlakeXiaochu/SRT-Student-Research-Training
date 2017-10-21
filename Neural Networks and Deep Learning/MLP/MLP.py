@@ -11,6 +11,19 @@ class MLP(object):
 	"""
 		mutiple layers perceptron class
 		layers including x layer and output layer, so neuronNums should be greater than 2.
+
+		Paramters:
+			neuronNums: a list/tuple representing numbers of each layer's neuron.
+			biases: a list/tuple containing numpy.ndarray object, which representing each layer's biases
+			weights: a list/tuple containing numpy.ndarray object, which representing each layer's weights
+			activateFunc: activation function type, it must be from FuncKit module(please see FuncKit.py for details)
+			lossFunc: loss function type, it must be from FuncKit module(please see FuncKit.py for details)
+			regular: wheather use regularization trick or not
+			momentum: wheather use momentum trick or not
+
+			**kw:
+				rLamda: regularization  coefficient
+				miu: momentum coefficient
 	"""
 	__slots__ = {'neuronNums', 'layerNum', 'layers', 'biases', 'weights', 'activateFunc', 'lossFunc', 'regular', 'rLambda', 'momentum', 'miu', 'velocity'}
 	def __init__(self):
@@ -60,7 +73,7 @@ class MLP(object):
 	#mini-batch stochastic gradient descent
 	def SGD(self, trainData, epochNum, batchSize, alpha, testData = None, monitor = False):
 		'''
-			trainData: a tuple/list of (samples, labels), in which samples and labels' type are 2-D numpy.ndarray
+			trainData: a tuple/list of (samples, labels), in which samples and labels' type are 2-D numpy.ndarray. each column represents one sample.
 			epochNum: the number of trainning epochs
 			batchSize: the number of trainning samples in each epoch
 			alpha: learning rate
@@ -118,7 +131,7 @@ class MLP(object):
 	def update(self, batch, alpha, totalSampleNum = None):
 		samples, labels = batch
 
-		#feedforward, and save intermadiate results using LIFO queue
+		#feedforward, and save intermediate results using LIFO queue
 		a = samples
 		zQ = queue.LifoQueue(maxsize = self.layerNum)
 		aQ = queue.LifoQueue(maxsize = self.layerNum)
